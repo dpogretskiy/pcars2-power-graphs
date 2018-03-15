@@ -21,13 +21,11 @@ fn main() {
         return;
     }
 
-    // let shared_data = unsafe { MapViewOfFile(file_handle, PAGE_READONLY, 0, 0, mem::size_of::<SharedMemory>()*/) as *const SharedMemory };
     let size_of = mem::size_of::<SharedMemory>() as usize;
 
     let shared_data: *const SharedMemory =
         unsafe { MapViewOfFile(file_handle, PAGE_READONLY, 0, 0, size_of) as *const SharedMemory };
-    // let shared_data = unsafe { MapViewOfFile(file_handle, PAGE_READONLY, 0, 0, 23000) as *const [u32; 23000 / 4]};
-
+    
     if shared_data.is_null() {
         unsafe {
             println!(
