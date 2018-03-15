@@ -1,13 +1,18 @@
+extern crate ggez;
 extern crate memmap;
 extern crate winapi;
 
 pub mod definitions;
+pub mod app;
+
 use definitions::*;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::memoryapi::*;
 use winapi::um::handleapi::*;
 use winapi::um::winnt::*;
 use std::mem;
+use ggez::*;
+use app::*;
 
 // pub const MAP_OBJECT_NAME: &str = "$pcars2$";
 pub const MAP_OBJECT_NAME: [u16; 9] = [36, 112, 99, 97, 114, 115, 50, 36, 0];
@@ -46,33 +51,12 @@ fn main() {
         return;
     }
 
-    loop {
-        let local_copy = unsafe { std::ptr::read_volatile(shared_data) };
-        let update_index = local_copy.mSequenceNumber;
+    let title = String::from("Don\'t take names seriously");
+    //Proceed to something useful!
+    let mut c = conf::Conf::new();
+    c.window_setup.title = title;
+    let ctx = &mut Context::load_from_conf(title, "dp", c).unwrap();
+    let state = &mut PC2App { shared_data };
+    event::run(ctx, state).unwrap();
 
-        if update_index % 2 == 0 {
-            continue;
-        }
-
-        println!("Current index: {}", update_index);
-
-        let is_valid_participant_index = local_copy.mViewedParticipantIndex != -1
-            && local_copy.mViewedParticipantIndex < local_copy.mNumParticipants
-            && local_copy.mViewedParticipantIndex < STORED_PARTICIPANTS_MAX as i32;
-
-        if is_valid_participant_index {
-            let info =
-                &local_copy.mParticipantInfo.data[local_copy.mViewedParticipantIndex as usize];
-
-            println!("Participant name: {}", info.mName.to_string());
-            println!("Lap distance: {}", info.mCurrentLapDistance);
-        }
-
-        println!("Game state: {:?}", local_copy.mGameState);
-        println!("Session state: {:?}", local_copy.mSessionState);
-        println!("Odometer KM: {:?}", local_copy.mOdometerKM);
-        println!("Car name: {}", local_copy.mCarName.to_string());
-
-        print!("{}[2J", 27 as char);
-    }
 }

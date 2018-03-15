@@ -272,7 +272,7 @@ pub struct ParticipantInfo {
   pub mCurrentSector: i32,       // [ RANGE = 0->... ]   [ UNSET = -1 ]
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct StringArray<T> {
   pub data: [T; STRING_LENGTH_MAX],
 }
@@ -294,7 +294,7 @@ pub struct Vec3<T> {
   pub z: T,
 }
 
-type PCString = StringArray<u8>;
+pub type PCString = StringArray<u8>;
 
 impl PCString {
   pub fn to_string(&self) -> String {
@@ -306,6 +306,10 @@ impl PCString {
       .collect::<Vec<_>>();
     let st = std::ffi::CString::new(v).unwrap_or(std::ffi::CString::new("").unwrap());
     st.into_string().unwrap()
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.data[0] == 0u8
   }
 }
 

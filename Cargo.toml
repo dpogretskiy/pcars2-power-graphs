@@ -6,3 +6,4 @@ authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 [dependencies]
 memmap = "0.6.2"
 winapi = { version = "0.3", features = ["errhandlingapi"] }
+ggez = "0.4"
