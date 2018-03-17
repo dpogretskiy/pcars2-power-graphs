@@ -18,6 +18,7 @@ pub struct PC2App {
     max_power: f32,
     screen_width: u32,
     screen_height: u32,
+    current_dots: [Point2; 2],
 }
 
 type ThrottleInput = f32;
@@ -70,6 +71,7 @@ impl PC2App {
             current_track: String::new(),
             screen_width,
             screen_height,
+            current_dots: [Point2::new(-10f32, -10f32), Point2::new(-10f32, -10f32)],
         }
     }
 }
@@ -97,6 +99,7 @@ impl event::EventHandler for PC2App {
             self.power_data.data = BTreeMap::new();
             self.shift_data.data = BTreeMap::new();
             self.max_power = 1f32;
+            self.current_dots = [Point2::new(-10f32, -10f32), Point2::new(-10f32, -10f32)];
             // let mut title = car_name;
             // title.push_str(" : ");
             // title.push_str(&track_name);
@@ -106,10 +109,24 @@ impl event::EventHandler for PC2App {
 
         let current_rpm = local_copy.mRpm as i32;
         let rpm = current_rpm - current_rpm % 10;
+        self.current_rpm = rpm;
         let current_torque = local_copy.mEngineTorque;
         let throttle = local_copy.mThrottle;
         let boost_pressure = local_copy.mTurboBoostPressure;
         let power = current_torque * rpm as f32 / 5252f32;
+        self.current_dots = {
+            let y_coeff = self.screen_height as f32 / (self.max_power * 1.3);
+            [
+                Point2::new(
+                    rpm as f32 * (self.screen_width as f32 / self.max_rpm as f32),
+                    self.screen_height as f32 - current_torque * y_coeff,
+                ),
+                Point2::new(
+                    rpm as f32 * (self.screen_width as f32 / self.max_rpm as f32),
+                    self.screen_height as f32 - power * y_coeff,
+                ),
+            ]
+        };
 
         if throttle > 0.9999 && local_copy.mClutch < 0.0001 {
             let data = self.power_data.data.entry(rpm).or_insert((
@@ -163,7 +180,7 @@ impl event::EventHandler for PC2App {
         let mut hp_line = Vec::new();
 
         for (rpm, ref triple) in self.power_data.data.iter() {
-            let (th, tq, bp) = *triple.clone();
+            let (th, tq, _bp) = *triple.clone();
 
             let x = *rpm as f32 * (self.screen_width as f32 / self.max_rpm as f32);
             let y_coeff = self.screen_height as f32 / (self.max_power * 1.3);
@@ -176,7 +193,6 @@ impl event::EventHandler for PC2App {
             torque_line.push(Point2::new(x, self.screen_height as f32 - tq * y_coeff));
             hp_line.push(Point2::new(x, self.screen_height as f32 - power * y_coeff));
         }
-
         //net
         {
             graphics::set_color(ctx, Color::from_rgba(127, 127, 127, 127))?;
@@ -185,7 +201,7 @@ impl event::EventHandler for PC2App {
                 graphics::line(
                     ctx,
                     &[
-                        Point2::new(x, 0f32),
+                        Point2::new(x, self.screen_height as f32 * 0.05),
                         Point2::new(x, self.screen_height as f32),
                     ],
                     1f32,
@@ -216,6 +232,12 @@ impl event::EventHandler for PC2App {
         if hp_line.len() > 1 {
             graphics::set_color(ctx, Color::from_rgb(197, 67, 67))?;
             graphics::line(ctx, &hp_line, 2f32)?;
+        }
+
+        //power_dots =
+        graphics::set_color(ctx, Color::from_rgb(255, 201, 11))?;
+        for dot in self.current_dots.iter() {
+            graphics::circle(ctx, DrawMode::Fill, dot.clone(), 4f32, 1f32)?;
         }
 
         //text;

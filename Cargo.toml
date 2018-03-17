@@ -7,3 +7,6 @@ authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 memmap = "0.6.2"
 winapi = { version = "0.3", features = ["errhandlingapi"] }
 ggez = "0.4"
+
+[profile.release]
+debug = true
