@@ -16,6 +16,8 @@ pub struct PC2App {
     power_data: PowerGraphData,
     shift_data: ShiftGraphData,
     max_power: f32,
+    graph_height: f32,
+    current_power: f32,
     screen_width: u32,
     screen_height: u32,
     current_dots: [Point2; 2],
@@ -61,6 +63,7 @@ impl PC2App {
             current_rpm: 0,
             max_rpm: 1,
             max_power: 1f32,
+            current_power: 1f32,
             power_data: PowerGraphData {
                 data: BTreeMap::new(),
             },
@@ -71,6 +74,7 @@ impl PC2App {
             current_track: String::new(),
             screen_width,
             screen_height,
+            graph_height: 300f32,
             current_dots: [Point2::new(-10f32, -10f32), Point2::new(-10f32, -10f32)],
         }
     }
@@ -99,6 +103,8 @@ impl event::EventHandler for PC2App {
             self.power_data.data = BTreeMap::new();
             self.shift_data.data = BTreeMap::new();
             self.max_power = 1f32;
+            self.current_power = 1f32;
+            self.graph_height = 300f32;
             self.current_dots = [Point2::new(-10f32, -10f32), Point2::new(-10f32, -10f32)];
             // let mut title = car_name;
             // title.push_str(" : ");
@@ -113,9 +119,9 @@ impl event::EventHandler for PC2App {
         let current_torque = local_copy.mEngineTorque;
         let throttle = local_copy.mThrottle;
         let boost_pressure = local_copy.mTurboBoostPressure;
-        let power = current_torque * rpm as f32 / 5252f32;
+        let power = (current_torque * rpm as f32 / 9548.8) / 0.7457;
         self.current_dots = {
-            let y_coeff = self.screen_height as f32 / (self.max_power * 1.3);
+            let y_coeff = self.screen_height as f32 / (self.graph_height * 1.1);
             [
                 Point2::new(
                     rpm as f32 * (self.screen_width as f32 / self.max_rpm as f32),
@@ -136,6 +142,8 @@ impl event::EventHandler for PC2App {
             ));
 
             self.max_power = self.max_power.max(power);
+            self.graph_height = self.graph_height.max(current_torque).max(power);
+            self.current_power = power;
 
             if data.1 < current_torque {
                 data.0 = throttle;
@@ -183,9 +191,9 @@ impl event::EventHandler for PC2App {
             let (th, tq, _bp) = *triple.clone();
 
             let x = *rpm as f32 * (self.screen_width as f32 / self.max_rpm as f32);
-            let y_coeff = self.screen_height as f32 / (self.max_power * 1.3);
+            let y_coeff = self.screen_height as f32 / (self.graph_height * 1.1);
 
-            let power = (tq as f32 * *rpm as f32) / 5252f32;
+            let power = (tq as f32 * *rpm as f32 / 9548.8) / 0.7457;
             throttle_line.push(Point2::new(
                 x,
                 self.screen_height as f32 - (th * self.screen_height as f32 * 0.95),
@@ -207,9 +215,9 @@ impl event::EventHandler for PC2App {
                     1f32,
                 )?;
             }
-            for horizontal in (0..(self.max_power * 1.3) as u32).step_by(200) {
+            for horizontal in (0..(self.graph_height * 1.1) as u32).step_by(200) {
                 let y = self.screen_height as f32
-                    - (horizontal as f32 * self.screen_height as f32 / self.max_power);
+                    - (horizontal as f32 * self.screen_height as f32 / self.graph_height);
                 graphics::line(
                     ctx,
                     &[
@@ -245,8 +253,12 @@ impl event::EventHandler for PC2App {
         let ix = graphics::Text::new(
             ctx,
             &format!(
-                "HP: {} MAXRPM: {}, GEAR: {}, RPM: {}",
-                self.max_power, self.max_rpm, self.current_gear, self.current_rpm
+                "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
+                self.max_power,
+                self.max_rpm,
+                self.current_gear,
+                self.current_rpm,
+                self.current_power,
             ),
             &self.assets.font,
         )?;
