@@ -209,7 +209,7 @@ impl event::EventHandler for PC2App {
             }
             for horizontal in (0..(self.max_power * 1.3) as u32).step_by(200) {
                 let y = self.screen_height as f32
-                    - (horizontal as f32 * self.screen_height as f32 / (self.max_power * 1.3));
+                    - (horizontal as f32 * self.screen_height as f32 / self.max_power);
                 graphics::line(
                     ctx,
                     &[
