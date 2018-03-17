@@ -272,7 +272,7 @@ pub struct ParticipantInfo {
   pub mCurrentSector: i32,       // [ RANGE = 0->... ]   [ UNSET = -1 ]
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 pub struct StringArray<T> {
   pub data: [T; STRING_LENGTH_MAX],
 }
@@ -297,6 +297,11 @@ pub struct Vec3<T> {
 pub type PCString = StringArray<u8>;
 
 impl PCString {
+  pub fn empty() -> PCString {
+    StringArray {
+      data: [0u8; STRING_LENGTH_MAX],
+    }
+  }
   pub fn to_string(&self) -> String {
     let v = self
       .data

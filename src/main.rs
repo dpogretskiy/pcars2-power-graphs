@@ -1,3 +1,5 @@
+#![feature(iterator_step_by)]
+
 extern crate ggez;
 extern crate memmap;
 extern crate winapi;
@@ -13,6 +15,8 @@ use winapi::um::winnt::*;
 use std::mem;
 use ggez::*;
 use app::*;
+use std::path;
+use std::env;
 
 // pub const MAP_OBJECT_NAME: &str = "$pcars2$";
 pub const MAP_OBJECT_NAME: [u16; 9] = [36, 112, 99, 97, 114, 115, 50, 36, 0];
@@ -51,12 +55,21 @@ fn main() {
         return;
     }
 
-    let title = String::from("Don\'t take names seriously");
-    //Proceed to something useful!
-    let mut c = conf::Conf::new();
-    c.window_setup.title = title;
-    let ctx = &mut Context::load_from_conf(title, "dp", c).unwrap();
-    let state = &mut PC2App { shared_data };
-    event::run(ctx, state).unwrap();
+    let mut cb = ContextBuilder::new("astroblasto", "ggez")
+        .window_setup(conf::WindowSetup::default().title("Don\'t take names seriously"))
+        .window_mode(conf::WindowMode::default().dimensions(800, 600));
 
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let mut path = path::PathBuf::from(manifest_dir);
+        path.push("resources");
+        println!("Adding path {:?}", path);
+        cb = cb.add_resource_path(path);
+    } else {
+        println!("Not building from cargo?  Ok.");
+    }
+
+    let ctx = &mut cb.build().unwrap();
+
+    let state = &mut PC2App::new(ctx, shared_data, 800, 600);
+    event::run(ctx, state).unwrap();
 }
