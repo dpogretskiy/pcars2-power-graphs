@@ -1,11 +1,10 @@
 [package]
-name = "pcars2sample"
-version = "0.1.0"
+name = "power-graph"
+version = "0.1.1"
 authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 
 [dependencies]
-memmap = "0.6.2"
-winapi = { version = "0.3", features = ["errhandlingapi"] }
+winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryapi"] }
 ggez = "0.4"
 
 [profile.release]

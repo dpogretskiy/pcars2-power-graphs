@@ -1,7 +1,6 @@
 #![feature(iterator_step_by)]
 
 extern crate ggez;
-extern crate memmap;
 extern crate winapi;
 
 pub mod definitions;
@@ -34,7 +33,7 @@ fn main() {
 
     let shared_data: *const SharedMemory =
         unsafe { MapViewOfFile(file_handle, PAGE_READONLY, 0, 0, size_of) as *const SharedMemory };
-    
+
     if shared_data.is_null() {
         unsafe {
             println!(
@@ -55,7 +54,7 @@ fn main() {
         return;
     }
 
-    let mut cb = ContextBuilder::new("astroblasto", "ggez")
+    let mut cb = ContextBuilder::new("power-graph", "ggez")
         .window_setup(conf::WindowSetup::default().title("Don\'t take names seriously"))
         .window_mode(conf::WindowMode::default().dimensions(800, 600));
 
