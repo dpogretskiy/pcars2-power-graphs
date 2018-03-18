@@ -15,6 +15,7 @@ pub struct PC2App {
     current_track: String,
     power_data: PowerGraphData,
     shift_data: ShiftGraphData,
+    optimized_text: OptimizedText,
     screen_width: f32,
     screen_height: f32,
 }
@@ -58,10 +59,23 @@ impl PC2App {
         screen_width: f32,
         screen_height: f32,
     ) -> PC2App {
+        let assets = Assets::load(ctx);
+        let fragments = vec![
+            graphics::Text::new(ctx, "MAXHP: ", &assets.font).unwrap(),
+            graphics::Text::new(ctx, "MAXRPM: ", &assets.font).unwrap(),
+            graphics::Text::new(ctx, "GEAR: ", &assets.font).unwrap(),
+            graphics::Text::new(ctx, "RPM: ", &assets.font).unwrap(),
+            graphics::Text::new(ctx, "HP: ", &assets.font).unwrap(),
+        ];
+
+        let optimized_text = OptimizedText::new(fragments);
+
+        // "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
         PC2App {
             shared_data: sm,
             local_copy: unsafe { std::ptr::read_volatile(sm) },
-            assets: Assets::load(ctx),
+            assets,
+            optimized_text,
             current_gear: 0,
             current_rpm: 0,
             max_rpm: 1,
@@ -210,27 +224,52 @@ impl event::EventHandler for PC2App {
         }
 
         //text;
-        let target = graphics::Point2::new(2f32, 2f32);
-        let ix = graphics::Text::new(
-            ctx,
-            &format!(
-                "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
-                self.power_data.power.max_value,
-                self.max_rpm,
-                self.current_gear,
-                self.current_rpm,
-                self.power_data.power.current_value.1,
-            ),
-            &self.assets.font,
-        )?;
-        graphics::set_color(ctx, WHITE)?;
-        graphics::draw(ctx, &ix, target, 0f32)?;
+        let values = vec![
+            self.power_data.power.max_value as i32,
+            self.max_rpm,
+            self.current_gear,
+            self.current_rpm,
+            self.power_data.power.current_value.1 as i32,
+        ];
+
+        self.optimized_text.draw(ctx, &self.assets.font, values)?;
 
         graphics::present(ctx);
 
         timer::yield_now();
         if timer::get_ticks(ctx) % 1000 == 0 {
             println!("FPS: {}", timer::get_fps(ctx));
+        }
+        Ok(())
+    }
+}
+
+pub struct OptimizedText {
+    names: Vec<graphics::Text>,
+}
+
+impl OptimizedText {
+    pub fn new(names: Vec<graphics::Text>) -> OptimizedText {
+        OptimizedText { names }
+    }
+
+    pub fn draw<T: ToString>(
+        &self,
+        ctx: &mut Context,
+        font: &graphics::Font,
+        values: Vec<T>,
+    ) -> GameResult<()> {
+        assert!(self.names.len() == values.len());
+        let mut target = graphics::Point2::new(2f32, 2f32);
+
+        graphics::set_color(ctx, WHITE)?;
+        for tuple in self.names.iter().zip(values.iter()) {
+            let (n, v) = tuple;
+            graphics::draw(ctx, n, target, 0f32)?;
+            target.x += n.width() as f32;
+            let v_text = graphics::Text::new(ctx, &v.to_string(), &font)?;
+            graphics::draw(ctx, &v_text, target, 0f32)?;
+            target.x += v_text.width() as f32 + 5f32;
         }
         Ok(())
     }
@@ -266,19 +305,21 @@ impl GraphLine {
     }
 
     pub fn add(&mut self, x: i32, y: f32, current_only: bool) {
-        self.current_value = (x, y);
-        self.max_value = self.max_value.max(y);
+        if self.current_value != (x, y) {
+            self.current_value = (x, y);
+            self.max_value = self.max_value.max(y);
 
-        if self.draw_shadow && y > 0f32 {
-            self.shadow.push_back((x, y));
-            if self.shadow.len() > 100 {
-                self.shadow.pop_front();
+            if self.draw_shadow && y > 0f32 {
+                self.shadow.push_back((x, y));
+                if self.shadow.len() > 100 {
+                    self.shadow.pop_front();
+                }
             }
-        }
-        if !current_only {
-            let step_x = x - x % self.step;
-            let entry = self.values.entry(step_x).or_insert(y);
-            *entry = entry.max(y);
+            if !current_only {
+                let step_x = x - x % self.step;
+                let entry = self.values.entry(step_x).or_insert(y);
+                *entry = entry.max(y);
+            }
         }
     }
 
