@@ -69,6 +69,6 @@ fn main() {
 
     let ctx = &mut cb.build().unwrap();
 
-    let state = &mut PC2App::new(ctx, shared_data, 800, 600);
+    let state = &mut PC2App::new(ctx, shared_data, 800f32, 600f32);
     event::run(ctx, state).unwrap();
 }
