@@ -135,11 +135,11 @@ impl event::EventHandler for PC2App {
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new();
             // self.shift_data.data = BTreeMap::new();
-            // let mut title = car_name;
-            // title.push_str(" : ");
-            // title.push_str(&track_name);
 
-            // ctx.conf.window_setup.title = title;
+            let mut title = car_name;
+            title.push_str(" @ ");
+            title.push_str(&track_name);
+            graphics::get_window_mut(_ctx).set_title(&title)?;
         }
 
         let current_rpm = local_copy.mRpm as i32;
@@ -222,13 +222,33 @@ impl event::EventHandler for PC2App {
         //net
         {
             graphics::set_color(ctx, Color::from_rgba(127, 127, 127, 127))?;
+
             for rpm_vert in (0..self.max_rpm as u32).step_by(1000) {
                 let x = rpm_vert as f32 * (self.screen_width / self.max_rpm as f32);
+
+                if rpm_vert == 1000 {
+                    let text = self.numeric_text_cache.numbers.get(&1000).unwrap();
+                    let dest = Point2::new(
+                        x + 2f32,
+                        self.screen_height - (text.height() as f32 / 2f32) - 2f32,
+                    );
+
+                    graphics::draw_ex(
+                        ctx,
+                        text,
+                        DrawParam {
+                            dest,
+                            scale: Point2::new(0.5, 0.5),
+                            ..Default::default()
+                        },
+                    )?;
+                }
+
                 graphics::line(
                     ctx,
                     &[
-                        Point2::new(x, self.screen_height as f32 * 0.05),
-                        Point2::new(x, self.screen_height as f32),
+                        Point2::new(x, self.screen_height * 0.05),
+                        Point2::new(x, self.screen_height),
                     ],
                     1f32,
                 )?;
@@ -236,6 +256,21 @@ impl event::EventHandler for PC2App {
             for horizontal in (0..(graph_height * 1.2) as u32).step_by(200) {
                 let y = self.screen_height
                     - (horizontal as f32 * self.screen_height as f32 / graph_height);
+
+                if horizontal == 200 {
+                    let text = self.numeric_text_cache.numbers.get(&200).unwrap();
+                    let dest = Point2::new(2f32, y - (text.height() as f32 / 2f32) - 2f32);
+                    graphics::draw_ex(
+                        ctx,
+                        text,
+                        DrawParam {
+                            dest,
+                            scale: Point2::new(0.5, 0.5),
+                            ..Default::default()
+                        },
+                    )?;
+                }
+
                 graphics::line(
                     ctx,
                     &[
@@ -277,27 +312,6 @@ impl OptimizedText {
     pub fn new(names: Vec<graphics::Text>) -> OptimizedText {
         OptimizedText { names }
     }
-
-    // pub fn draw<T: ToString>(
-    //     &self,
-    //     ctx: &mut Context,
-    //     font: &graphics::Font,
-    //     values: Vec<T>,
-    // ) -> GameResult<()> {
-    //     assert!(self.names.len() == values.len());
-    //     let mut target = graphics::Point2::new(2f32, 2f32);
-
-    //     graphics::set_color(ctx, WHITE)?;
-    //     for tuple in self.names.iter().zip(values.iter()) {
-    //         let (n, v) = tuple;
-    //         graphics::draw(ctx, n, target, 0f32)?;
-    //         target.x += n.width() as f32;
-    //         let v_text = graphics::Text::new(ctx, &v.to_string(), &font)?;
-    //         graphics::draw(ctx, &v_text, target, 0f32)?;
-    //         target.x += v_text.width() as f32 + 3f32;
-    //     }
-    //     Ok(())
-    // }
 
     pub fn draw_num_cache<'a>(
         &self,
@@ -395,11 +409,11 @@ impl GraphLine {
                     1f32,
                 )?;
             }
-            if self.draw_shadow {
+            if self.draw_shadow && !self.shadow.is_empty() {
                 let alpha_step = 1f32 / self.shadow.len() as f32;
                 let mut shadow_color = dot_color.clone();
                 shadow_color.a = 1f32;
-                let mut last_dot = self.current_value;
+                let mut last_dot = self.shadow.back().unwrap().clone();
                 for ref dot in self.shadow.iter().rev() {
                     shadow_color.a -= alpha_step;
                     if dot.1 > 0f32 || last_dot.1 > 0f32 {
