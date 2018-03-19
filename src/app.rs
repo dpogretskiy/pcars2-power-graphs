@@ -1,10 +1,15 @@
 use definitions::*;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std;
 use ggez::*;
 use ggez::graphics::*;
 
+pub enum Options {
+    ShiftGraph,
+}
+
 pub struct PC2App {
+    options: Vec<Options>,
     shared_data: *const SharedMemory,
     local_copy: SharedMemory,
     assets: Assets,
@@ -14,8 +19,9 @@ pub struct PC2App {
     current_car: String,
     current_track: String,
     power_data: PowerGraphData,
-    shift_data: ShiftGraphData,
+    gear_data: GearGraphData,
     optimized_text: OptimizedText,
+    numeric_text_cache: NumericTextCache,
     screen_width: f32,
     screen_height: f32,
 }
@@ -36,9 +42,24 @@ impl PowerGraphData {
     }
 }
 
-pub struct ShiftGraphData {
-    pub data: BTreeMap<i32, Vec<(i32, i32)>>,
+pub struct NumericTextCache {
+    numbers: HashMap<i32, graphics::Text>,
 }
+
+impl NumericTextCache {
+    pub fn new(ctx: &mut Context, font: &graphics::Font) -> NumericTextCache {
+        let mut numbers = HashMap::new();
+
+        for number in (-1500..1501).chain((1510..20001).step_by(10)) {
+            let txt = graphics::Text::new(ctx, &number.to_string(), font).unwrap();
+            numbers.insert(number, txt);
+        }
+
+        NumericTextCache { numbers }
+    }
+}
+
+pub struct GearGraphData {}
 
 pub struct Assets {
     font: graphics::Font,
@@ -67,6 +88,7 @@ impl PC2App {
             graphics::Text::new(ctx, "RPM: ", &assets.font).unwrap(),
             graphics::Text::new(ctx, "HP: ", &assets.font).unwrap(),
         ];
+        let numeric_text_cache = NumericTextCache::new(ctx, &assets.font);
 
         let optimized_text = OptimizedText::new(fragments);
 
@@ -80,13 +102,13 @@ impl PC2App {
             current_rpm: 0,
             max_rpm: 1,
             power_data: PowerGraphData::new(),
-            shift_data: ShiftGraphData {
-                data: BTreeMap::new(),
-            },
+            gear_data: GearGraphData {},
             current_car: String::new(),
             current_track: String::new(),
             screen_width,
             screen_height,
+            numeric_text_cache,
+            options: vec![],
         }
     }
 }
@@ -112,7 +134,7 @@ impl event::EventHandler for PC2App {
             self.current_track = track_name.clone();
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new();
-            self.shift_data.data = BTreeMap::new();
+            // self.shift_data.data = BTreeMap::new();
             // let mut title = car_name;
             // title.push_str(" : ");
             // title.push_str(&track_name);
@@ -133,28 +155,30 @@ impl event::EventHandler for PC2App {
         self.power_data.torque.add(rpm, torque, currents_only);
         self.power_data.power.add(rpm, power, currents_only);
 
-        if self.current_gear != local_copy.mGear {
-            let old_gear = self.current_gear;
-            let new_gear = local_copy.mGear;
-            let old_rpm = self.current_rpm;
-            let new_rpm = current_rpm;
-            self.current_gear = new_gear;
-            self.current_rpm = new_rpm;
+        self.current_gear = local_copy.mGear;
 
-            match new_gear {
-                3 | 4 | 5 | 6 | 7 => {
-                    if old_gear + 1 == new_gear {
-                        let gn = old_gear * 10 + new_gear;
-                        let v = self.shift_data.data.entry(gn).or_insert(Vec::new());
-                        v.push((new_rpm, old_rpm));
-                        if v.len() > 5 {
-                            v.remove(0);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+        // if self.current_gear != local_copy.mGear {
+        //     let old_gear = self.current_gear;
+        //     let new_gear = local_copy.mGear;
+        //     let old_rpm = self.current_rpm;
+        //     let new_rpm = current_rpm;
+        //     self.current_gear = new_gear;
+        //     self.current_rpm = new_rpm;
+
+        //     match new_gear {
+        //         3 | 4 | 5 | 6 | 7 => {
+        //             if old_gear + 1 == new_gear {
+        //                 let gn = old_gear * 10 + new_gear;
+        //                 let v = self.shift_data.data.entry(gn).or_insert(Vec::new());
+        //                 v.push((new_rpm, old_rpm));
+        //                 if v.len() > 5 {
+        //                     v.remove(0);
+        //                 }
+        //             }
+        //         }
+        //         _ => {}
+        //     }
+        // }
 
         self.local_copy = local_copy;
         Ok(())
@@ -232,7 +256,8 @@ impl event::EventHandler for PC2App {
             self.power_data.power.current_value.1 as i32,
         ];
 
-        self.optimized_text.draw(ctx, &self.assets.font, values)?;
+        self.optimized_text
+            .draw_num_cache(ctx, &values, &self.numeric_text_cache)?;
 
         graphics::present(ctx);
 
@@ -253,23 +278,45 @@ impl OptimizedText {
         OptimizedText { names }
     }
 
-    pub fn draw<T: ToString>(
+    // pub fn draw<T: ToString>(
+    //     &self,
+    //     ctx: &mut Context,
+    //     font: &graphics::Font,
+    //     values: Vec<T>,
+    // ) -> GameResult<()> {
+    //     assert!(self.names.len() == values.len());
+    //     let mut target = graphics::Point2::new(2f32, 2f32);
+
+    //     graphics::set_color(ctx, WHITE)?;
+    //     for tuple in self.names.iter().zip(values.iter()) {
+    //         let (n, v) = tuple;
+    //         graphics::draw(ctx, n, target, 0f32)?;
+    //         target.x += n.width() as f32;
+    //         let v_text = graphics::Text::new(ctx, &v.to_string(), &font)?;
+    //         graphics::draw(ctx, &v_text, target, 0f32)?;
+    //         target.x += v_text.width() as f32 + 3f32;
+    //     }
+    //     Ok(())
+    // }
+
+    pub fn draw_num_cache<'a>(
         &self,
         ctx: &mut Context,
-        font: &graphics::Font,
-        values: Vec<T>,
+        values: &[i32],
+        cache: &NumericTextCache,
     ) -> GameResult<()> {
-        assert!(self.names.len() == values.len());
         let mut target = graphics::Point2::new(2f32, 2f32);
-
         graphics::set_color(ctx, WHITE)?;
-        for tuple in self.names.iter().zip(values.iter()) {
-            let (n, v) = tuple;
+
+        for (n, v) in self.names.iter().zip(values.iter()) {
             graphics::draw(ctx, n, target, 0f32)?;
             target.x += n.width() as f32;
-            let v_text = graphics::Text::new(ctx, &v.to_string(), &font)?;
-            graphics::draw(ctx, &v_text, target, 0f32)?;
-            target.x += v_text.width() as f32 + 5f32;
+            if let Some(value) = cache.numbers.get(v) {
+                graphics::draw(ctx, value, target, 0f32)?;
+                target.x += value.width() as f32 + 3f32;
+            } else {
+                println!("No cached value: {}", v);
+            }
         }
         Ok(())
     }
