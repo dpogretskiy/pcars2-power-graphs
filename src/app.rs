@@ -114,73 +114,75 @@ impl PC2App {
 }
 
 impl event::EventHandler for PC2App {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        let local_copy = unsafe { std::ptr::read_volatile(self.shared_data) };
-        let update_index = local_copy.mSequenceNumber;
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        while !timer::check_update_time(ctx, 60) {
+            let local_copy = unsafe { std::ptr::read_volatile(self.shared_data) };
+            let update_index = local_copy.mSequenceNumber;
 
-        if update_index % 2 != 0 || update_index == self.local_copy.mSequenceNumber {
-            return Ok(());
+            if update_index % 2 != 0 || update_index == self.local_copy.mSequenceNumber {
+                continue;
+            }
+
+            let track_name = local_copy.mTrackLocation.clone().to_string();
+            let car_name = local_copy.mCarName.clone().to_string();
+
+            if track_name.is_empty() || car_name.is_empty() {
+                continue;
+            }
+
+            if self.current_car != car_name || self.current_track != track_name {
+                self.current_car = car_name.clone();
+                self.current_track = track_name.clone();
+                self.max_rpm = local_copy.mMaxRPM as i32;
+                self.power_data = PowerGraphData::new();
+                // self.shift_data.data = BTreeMap::new();
+
+                let mut title = car_name;
+                title.push_str(" @ ");
+                title.push_str(&track_name);
+                graphics::get_window_mut(ctx).set_title(&title)?;
+            }
+
+            let current_rpm = local_copy.mRpm as i32;
+            let rpm = current_rpm - current_rpm % 10;
+            self.current_rpm = rpm;
+            let throttle = local_copy.mThrottle;
+            let torque = local_copy.mEngineTorque;
+            let power = (torque * rpm as f32 / 9548.8) / 0.7457;
+
+            let currents_only = !(throttle > 0.9999 && local_copy.mClutch < 0.0001);
+
+            self.power_data.throttle.add(rpm, throttle, currents_only);
+            self.power_data.torque.add(rpm, torque, currents_only);
+            self.power_data.power.add(rpm, power, currents_only);
+
+            self.current_gear = local_copy.mGear;
+
+            // if self.current_gear != local_copy.mGear {
+            //     let old_gear = self.current_gear;
+            //     let new_gear = local_copy.mGear;
+            //     let old_rpm = self.current_rpm;
+            //     let new_rpm = current_rpm;
+            //     self.current_gear = new_gear;
+            //     self.current_rpm = new_rpm;
+
+            //     match new_gear {
+            //         3 | 4 | 5 | 6 | 7 => {
+            //             if old_gear + 1 == new_gear {
+            //                 let gn = old_gear * 10 + new_gear;
+            //                 let v = self.shift_data.data.entry(gn).or_insert(Vec::new());
+            //                 v.push((new_rpm, old_rpm));
+            //                 if v.len() > 5 {
+            //                     v.remove(0);
+            //                 }
+            //             }
+            //         }
+            //         _ => {}
+            //     }
+            // }
+
+            self.local_copy = local_copy;
         }
-
-        let track_name = local_copy.mTrackLocation.clone().to_string();
-        let car_name = local_copy.mCarName.clone().to_string();
-
-        if track_name.is_empty() || car_name.is_empty() {
-            return Ok(());
-        }
-
-        if self.current_car != car_name || self.current_track != track_name {
-            self.current_car = car_name.clone();
-            self.current_track = track_name.clone();
-            self.max_rpm = local_copy.mMaxRPM as i32;
-            self.power_data = PowerGraphData::new();
-            // self.shift_data.data = BTreeMap::new();
-
-            let mut title = car_name;
-            title.push_str(" @ ");
-            title.push_str(&track_name);
-            graphics::get_window_mut(_ctx).set_title(&title)?;
-        }
-
-        let current_rpm = local_copy.mRpm as i32;
-        let rpm = current_rpm - current_rpm % 10;
-        self.current_rpm = rpm;
-        let throttle = local_copy.mThrottle;
-        let torque = local_copy.mEngineTorque;
-        let power = (torque * rpm as f32 / 9548.8) / 0.7457;
-
-        let currents_only = !(throttle > 0.9999 && local_copy.mClutch < 0.0001);
-
-        self.power_data.throttle.add(rpm, throttle, currents_only);
-        self.power_data.torque.add(rpm, torque, currents_only);
-        self.power_data.power.add(rpm, power, currents_only);
-
-        self.current_gear = local_copy.mGear;
-
-        // if self.current_gear != local_copy.mGear {
-        //     let old_gear = self.current_gear;
-        //     let new_gear = local_copy.mGear;
-        //     let old_rpm = self.current_rpm;
-        //     let new_rpm = current_rpm;
-        //     self.current_gear = new_gear;
-        //     self.current_rpm = new_rpm;
-
-        //     match new_gear {
-        //         3 | 4 | 5 | 6 | 7 => {
-        //             if old_gear + 1 == new_gear {
-        //                 let gn = old_gear * 10 + new_gear;
-        //                 let v = self.shift_data.data.entry(gn).or_insert(Vec::new());
-        //                 v.push((new_rpm, old_rpm));
-        //                 if v.len() > 5 {
-        //                     v.remove(0);
-        //                 }
-        //             }
-        //         }
-        //         _ => {}
-        //     }
-        // }
-
-        self.local_copy = local_copy;
         Ok(())
     }
 
