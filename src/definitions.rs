@@ -287,11 +287,17 @@ pub struct TyresArray<T> {
   pub data: [T; TYRE_MAX],
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Vec3<T> {
   pub x: T,
   pub y: T,
   pub z: T,
+}
+
+impl Vec3<f32> {
+  pub fn length(&self) -> f32 {
+    (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+  }
 }
 
 pub type PCString = StringArray<u8>;

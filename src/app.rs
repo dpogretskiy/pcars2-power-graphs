@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std;
 use ggez::*;
 use ggez::graphics::*;
+use std::f32;
+use super::graphs::*;
 
 pub enum Options {
     ShiftGraph,
@@ -12,34 +14,17 @@ pub struct PC2App {
     options: Vec<Options>,
     shared_data: *const SharedMemory,
     local_copy: SharedMemory,
-    assets: Assets,
     current_gear: i32,
     current_rpm: i32,
     max_rpm: i32,
     current_car: String,
     current_track: String,
     power_data: PowerGraphData,
-    gear_data: GearGraphData,
     optimized_text: OptimizedText,
     numeric_text_cache: NumericTextCache,
     screen_width: f32,
     screen_height: f32,
-}
-
-pub struct PowerGraphData {
-    pub throttle: GraphLine,
-    pub torque: GraphLine,
-    pub power: GraphLine,
-}
-
-impl PowerGraphData {
-    pub fn new() -> PowerGraphData {
-        PowerGraphData {
-            throttle: GraphLine::new(10, false, false),
-            torque: GraphLine::new(10, true, true),
-            power: GraphLine::new(10, true, true),
-        }
-    }
+    stupid_graphs: StupidGraphData,
 }
 
 pub struct NumericTextCache {
@@ -59,20 +44,6 @@ impl NumericTextCache {
     }
 }
 
-pub struct GearGraphData {}
-
-pub struct Assets {
-    font: graphics::Font,
-}
-
-impl Assets {
-    pub fn load(ctx: &mut Context) -> Assets {
-        Assets {
-            font: graphics::Font::new(ctx, "/DejaVuSerif.ttf", 18).unwrap(),
-        }
-    }
-}
-
 impl PC2App {
     pub fn new(
         ctx: &mut Context,
@@ -80,36 +51,40 @@ impl PC2App {
         screen_width: f32,
         screen_height: f32,
     ) -> PC2App {
-        let assets = Assets::load(ctx);
+        let font = PC2App::load_font(ctx);
         let fragments = vec![
-            graphics::Text::new(ctx, "MAXHP: ", &assets.font).unwrap(),
-            graphics::Text::new(ctx, "MAXRPM: ", &assets.font).unwrap(),
-            graphics::Text::new(ctx, "GEAR: ", &assets.font).unwrap(),
-            graphics::Text::new(ctx, "RPM: ", &assets.font).unwrap(),
-            graphics::Text::new(ctx, "HP: ", &assets.font).unwrap(),
+            graphics::Text::new(ctx, "MAXHP: ", &font).unwrap(),
+            graphics::Text::new(ctx, "MAXRPM: ", &font).unwrap(),
+            graphics::Text::new(ctx, "GEAR: ", &font).unwrap(),
+            graphics::Text::new(ctx, "RPM: ", &font).unwrap(),
+            graphics::Text::new(ctx, "HP: ", &font).unwrap(),
+            graphics::Text::new(ctx, "R: ", &font).unwrap(),
+            graphics::Text::new(ctx, "Rot: ", &font).unwrap(),
         ];
-        let numeric_text_cache = NumericTextCache::new(ctx, &assets.font);
-
+        let numeric_text_cache = NumericTextCache::new(ctx, &font);
         let optimized_text = OptimizedText::new(fragments);
 
         // "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
         PC2App {
             shared_data: sm,
             local_copy: unsafe { std::ptr::read_volatile(sm) },
-            assets,
             optimized_text,
             current_gear: 0,
             current_rpm: 0,
             max_rpm: 1,
             power_data: PowerGraphData::new(),
-            gear_data: GearGraphData {},
             current_car: String::new(),
             current_track: String::new(),
             screen_width,
             screen_height,
             numeric_text_cache,
             options: vec![],
+            stupid_graphs: StupidGraphData::new(),
         }
+    }
+
+    pub fn load_font(ctx: &mut Context) -> graphics::Font {
+        graphics::Font::new(ctx, "/DejaVuSerif.ttf", 18).unwrap()
     }
 }
 
@@ -134,12 +109,12 @@ impl event::EventHandler for PC2App {
             self.current_track = track_name.clone();
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new();
-            // self.shift_data.data = BTreeMap::new();
+            self.stupid_graphs = StupidGraphData::new();
 
             let mut title = car_name;
             title.push_str(" @ ");
             title.push_str(&track_name);
-            graphics::get_window_mut(_ctx).set_title(&title)?;
+            graphics::get_window_mut(_ctx).set_title(&title).unwrap();
         }
 
         let current_rpm = local_copy.mRpm as i32;
@@ -157,28 +132,65 @@ impl event::EventHandler for PC2App {
 
         self.current_gear = local_copy.mGear;
 
-        // if self.current_gear != local_copy.mGear {
-        //     let old_gear = self.current_gear;
-        //     let new_gear = local_copy.mGear;
-        //     let old_rpm = self.current_rpm;
-        //     let new_rpm = current_rpm;
-        //     self.current_gear = new_gear;
-        //     self.current_rpm = new_rpm;
+        //stupid stuff
+        {
+            if self.current_gear > 0 {
+                let velocity = -local_copy.mLocalVelocity.z;
+                let tyre_rps_arr = local_copy.mTyreRPS.clone();
+                let differential = (tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
+                    - tyre_rps_arr.data[Tyre::TyreRearRight as usize])
+                    .abs();
+                let inputs = Inputs::from(&local_copy);
+                let x_velocity = local_copy.mLocalVelocity.x;
 
-        //     match new_gear {
-        //         3 | 4 | 5 | 6 | 7 => {
-        //             if old_gear + 1 == new_gear {
-        //                 let gn = old_gear * 10 + new_gear;
-        //                 let v = self.shift_data.data.entry(gn).or_insert(Vec::new());
-        //                 v.push((new_rpm, old_rpm));
-        //                 if v.len() > 5 {
-        //                     v.remove(0);
-        //                 }
-        //             }
-        //         }
-        //         _ => {}
-        //     }
-        // }
+                let tyre_rps = ((tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
+                    + tyre_rps_arr.data[Tyre::TyreRearRight as usize])
+                    / 2f32)
+                    .abs();
+
+                let ratio = (rpm as f32 / tyre_rps);
+
+                let acceleration = -local_copy.mLocalAcceleration.z;
+
+                if self.stupid_graphs.max_ratio < ratio {
+                    self.stupid_graphs.max_ratio = ratio;
+                }
+
+                if self.stupid_graphs.max_rotations < tyre_rps {
+                    self.stupid_graphs.max_rotations = tyre_rps;
+                    self.stupid_graphs.max_rotations_gear = self.current_gear;
+                    self.stupid_graphs.max_rotations_rpm = rpm;
+                }
+
+                let mut ratio_struct = Ratio {
+                    gear: self.current_gear,
+                    acceleration,
+                    ratio,
+                    velocity: tyre_rps,
+                    x_velocity,
+                    rpm: rpm as f32,
+                    differential,
+                    inputs: inputs.clone(),
+                };
+
+                let entry = self.stupid_graphs
+                    .ratios
+                    .entry(self.current_gear)
+                    .or_insert(ratio_struct.clone());
+
+                if inputs.throttle > 0.2 && inputs.clutch <= f32::EPSILON
+                    && inputs.brake <= f32::EPSILON
+                    && (differential <= entry.differential)
+                // && entry.ratio > ratio
+                {
+                    std::mem::swap(entry, &mut ratio_struct);
+                }
+            }
+
+            // if timer::get_ticks(_ctx) % 1000 == 0 {
+            //     println!("Stupid_data: {:?}", self.stupid_graphs);
+            // }
+        }
 
         self.local_copy = local_copy;
         Ok(())
@@ -203,21 +215,29 @@ impl event::EventHandler for PC2App {
         let x_scale = self.screen_width / self.max_rpm as f32;
         let y_scale = self.screen_height / graph_height;
 
-        self.power_data
-            .throttle
-            .set_scale(x_scale, self.screen_height * 0.95);
-        self.power_data.torque.set_scale(x_scale, y_scale);
-        self.power_data.power.set_scale(x_scale, y_scale);
+        let power_scale = Point2::new(x_scale, y_scale);
 
-        self.power_data
-            .throttle
-            .draw(ctx, throttle_color, throttle_color, self.screen_height)?;
-        self.power_data
-            .torque
-            .draw(ctx, torque_color, torque_dot, self.screen_height)?;
-        self.power_data
-            .power
-            .draw(ctx, hp_color, hp_dot, self.screen_height)?;
+        self.power_data.throttle.draw(
+            ctx,
+            throttle_color,
+            throttle_color,
+            self.screen_height,
+            Point2::new(x_scale, self.screen_height * 0.95),
+        )?;
+        self.power_data.torque.draw(
+            ctx,
+            torque_color,
+            torque_dot,
+            self.screen_height,
+            power_scale.clone(),
+        )?;
+        self.power_data.power.draw(
+            ctx,
+            hp_color,
+            hp_dot,
+            self.screen_height,
+            power_scale.clone(),
+        )?;
 
         //net
         {
@@ -289,17 +309,27 @@ impl event::EventHandler for PC2App {
             self.current_gear,
             self.current_rpm,
             self.power_data.power.current_value.1 as i32,
+            self.stupid_graphs
+                .ratios
+                .get(&self.current_gear)
+                .map(|a| a.ratio.clone())
+                .unwrap_or(0f32) as i32,
+            self.stupid_graphs.max_rotations as i32,
         ];
+
+        self.stupid_graphs.draw(
+            ctx,
+            &self.power_data,
+            &Point2::new(self.screen_width, self.screen_height),
+            self.current_gear,
+            self.max_rpm,
+        )?;
 
         self.optimized_text
             .draw_num_cache(ctx, &values, &self.numeric_text_cache)?;
 
         graphics::present(ctx);
 
-        timer::yield_now();
-        if timer::get_ticks(ctx) % 1000 == 0 {
-            println!("FPS: {}", timer::get_fps(ctx));
-        }
         Ok(())
     }
 }
@@ -329,115 +359,9 @@ impl OptimizedText {
                 graphics::draw(ctx, value, target, 0f32)?;
                 target.x += value.width() as f32 + 3f32;
             } else {
-                println!("No cached value: {}", v);
+                // println!("No cached value: {}", v);
             }
         }
         Ok(())
     }
-}
-
-pub struct GraphLine {
-    step: i32,
-    draw_dot: bool,
-    draw_shadow: bool,
-    values: BTreeMap<i32, f32>,
-    shadow: VecDeque<(i32, f32)>,
-    current_value: (i32, f32),
-    scale: Point2,
-    pub max_value: f32,
-}
-
-impl GraphLine {
-    pub fn new(step: i32, draw_dot: bool, draw_shadow: bool) -> GraphLine {
-        GraphLine {
-            values: BTreeMap::new(),
-            shadow: VecDeque::new(),
-            max_value: 1f32,
-            current_value: (0, 0f32),
-            step,
-            draw_dot,
-            draw_shadow,
-            scale: Point2::new(1f32, 1f32),
-        }
-    }
-
-    pub fn set_scale(&mut self, x: f32, y: f32) {
-        self.scale = Point2::new(x, y);
-    }
-
-    pub fn add(&mut self, x: i32, y: f32, current_only: bool) {
-        if self.current_value != (x, y) {
-            self.current_value = (x, y);
-            self.max_value = self.max_value.max(y);
-
-            if self.draw_shadow && y > 0f32 {
-                self.shadow.push_back((x, y));
-                if self.shadow.len() > 100 {
-                    self.shadow.pop_front();
-                }
-            }
-            if !current_only {
-                let step_x = x - x % self.step;
-                let entry = self.values.entry(step_x).or_insert(y);
-                *entry = entry.max(y);
-            }
-        }
-    }
-
-    pub fn draw(
-        &self,
-        ctx: &mut Context,
-        line_color: Color,
-        dot_color: Color,
-        screen_height: f32,
-    ) -> GameResult<()> {
-        if self.values.len() > 1 {
-            let v: Vec<_> = self.values
-                .iter()
-                .map(|(k, v)| scale_mult(Point2::new(*k as f32, *v), &self.scale, screen_height))
-                .collect();
-            graphics::set_color(ctx, line_color)?;
-            graphics::line(ctx, &v, 2f32)?;
-            if self.draw_dot && !self.draw_shadow && self.current_value.1 > 0f32 {
-                graphics::set_color(ctx, dot_color)?;
-                let dot = Point2::new(self.current_value.0 as f32, self.current_value.1);
-                graphics::circle(
-                    ctx,
-                    DrawMode::Fill,
-                    scale_mult(dot, &self.scale, screen_height),
-                    3f32,
-                    1f32,
-                )?;
-            }
-            if self.draw_shadow && !self.shadow.is_empty() {
-                let alpha_step = 1f32 / self.shadow.len() as f32;
-                let mut shadow_color = dot_color.clone();
-                shadow_color.a = 1f32;
-                let mut last_dot = self.shadow.back().unwrap().clone();
-                for ref dot in self.shadow.iter().rev() {
-                    shadow_color.a -= alpha_step;
-                    if dot.1 > 0f32 || last_dot.1 > 0f32 {
-                        graphics::set_color(ctx, shadow_color.clone())?;
-                        let point = scale_mult(
-                            Point2::new(dot.0 as f32, dot.1),
-                            &self.scale,
-                            screen_height,
-                        );
-                        let last_point = scale_mult(
-                            Point2::new(last_dot.0 as f32, last_dot.1),
-                            &self.scale,
-                            screen_height,
-                        );
-                        graphics::line(ctx, &[point, last_point], 2f32)?;
-                        last_dot = *dot.clone();
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-fn scale_mult(x: Point2, y: &Point2, screen_height: f32) -> Point2 {
-    Point2::new(x.x * y.x, screen_height - x.y * y.y)
 }

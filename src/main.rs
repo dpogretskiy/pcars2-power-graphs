@@ -5,6 +5,7 @@ extern crate winapi;
 
 pub mod definitions;
 pub mod app;
+pub mod graphs;
 
 use definitions::*;
 use winapi::um::errhandlingapi::GetLastError;
@@ -45,9 +46,9 @@ fn main() {
         return;
     }
 
-    println!("Shared memory version: {:?}", unsafe {
-        (*shared_data).mVersion
-    });
+    // println!("Shared memory version: {:?}", unsafe {
+    //     (*shared_data).mVersion
+    // });
 
     if unsafe { (*shared_data).mVersion } != SHARED_MEMORY_VERSION {
         println!("Data version mismatch!");
@@ -61,10 +62,10 @@ fn main() {
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         let mut path = path::PathBuf::from(manifest_dir);
         path.push("resources");
-        println!("Adding path {:?}", path);
+        // println!("Adding path {:?}", path);
         cb = cb.add_resource_path(path);
     } else {
-        println!("Not building from cargo?  Ok.");
+        // println!("Not building from cargo?  Ok.");
     }
 
     let ctx = &mut cb.build().unwrap();
