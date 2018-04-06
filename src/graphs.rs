@@ -4,6 +4,7 @@ use std;
 use ggez::*;
 use ggez::graphics::*;
 use std::f32;
+use std::cmp::Ordering;
 
 pub struct GraphLine {
     step: i32,
@@ -198,12 +199,21 @@ impl StupidGraphData {
         if !self.ratios.is_empty() && power.torque.values.len() > 1 {
             let max_gear = self.ratios
                 .keys()
-                .cloned()
-                .max_by_key(|a| a.clone())
+                .max_by_key(|x| x.clone())
                 .unwrap()
                 .clone();
 
-            let max_ratio = self.ratios.get(&1).map(|x| x.ratio).unwrap_or(150f32);
+            let max_ratio = self.ratios
+                .iter()
+                .max_by(|x, y| {
+                    if x.1.ratio <= y.1.ratio {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                })
+                .map(|x| x.1.ratio)
+                .unwrap_or(300f32);
 
             let y_scale = screen_size.y * 0.95 / (max_ratio * power.torque.max_value);
 

@@ -1,4 +1,5 @@
 #![feature(iterator_step_by)]
+#![windows_subsystem = "windows"]
 
 extern crate ggez;
 extern crate winapi;

@@ -130,10 +130,10 @@ impl event::EventHandler for PC2App {
         self.power_data.torque.add(rpm, torque, currents_only);
         self.power_data.power.add(rpm, power, currents_only);
 
-        self.current_gear = local_copy.mGear;
-
         //stupid stuff
-        {
+        if self.current_gear != local_copy.mGear {
+            self.current_gear = local_copy.mGear;
+        } else {
             if self.current_gear > 0 {
                 let velocity = -local_copy.mLocalVelocity.z;
                 let tyre_rps_arr = local_copy.mTyreRPS.clone();
@@ -156,7 +156,20 @@ impl event::EventHandler for PC2App {
                     self.stupid_graphs.max_ratio = ratio;
                 }
 
-                if self.stupid_graphs.max_rotations < tyre_rps {
+                //we want it to be minimal ratio gear also, so some lifting is going on here :)
+                let min_known_ratio = self.stupid_graphs
+                    .ratios
+                    .iter()
+                    .min_by_key(|x| x.1.ratio as i32)
+                    .map(|x| x.1.ratio.clone());
+
+                if let Some(min_ratio) = min_known_ratio {
+                    if self.stupid_graphs.max_rotations_gear != self.current_gear && ratio < min_ratio {
+                        self.stupid_graphs.max_rotations = tyre_rps;
+                        self.stupid_graphs.max_rotations_gear = self.current_gear;
+                        self.stupid_graphs.max_rotations_rpm = rpm;
+                    }
+                } else if self.stupid_graphs.max_rotations < tyre_rps {
                     self.stupid_graphs.max_rotations = tyre_rps;
                     self.stupid_graphs.max_rotations_gear = self.current_gear;
                     self.stupid_graphs.max_rotations_rpm = rpm;
