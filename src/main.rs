@@ -1,4 +1,5 @@
 #![feature(iterator_step_by)]
+#![feature(duration_extras)]
 #![windows_subsystem = "windows"]
 
 extern crate ggez;
@@ -7,6 +8,7 @@ extern crate winapi;
 pub mod definitions;
 pub mod app;
 pub mod graphs;
+pub mod util;
 
 use definitions::*;
 use winapi::um::errhandlingapi::GetLastError;
@@ -57,8 +59,13 @@ fn main() {
     }
 
     let mut cb = ContextBuilder::new("power-graph", "ggez")
-        .window_setup(conf::WindowSetup::default().title("Don\'t take names seriously"))
-        .window_mode(conf::WindowMode::default().dimensions(800, 600));
+        .window_setup(
+            conf::WindowSetup::default()
+                .title("Don\'t take names seriously")
+                .samples(4)
+                .unwrap(),
+        )
+        .window_mode(conf::WindowMode::default().dimensions(1200, 600));
 
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         let mut path = path::PathBuf::from(manifest_dir);
@@ -71,6 +78,6 @@ fn main() {
 
     let ctx = &mut cb.build().unwrap();
 
-    let state = &mut PC2App::new(ctx, shared_data, 800f32, 600f32);
+    let state = &mut PC2App::new(ctx, shared_data, 1200f32, 600f32, 20);
     event::run(ctx, state).unwrap();
 }

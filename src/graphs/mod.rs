@@ -1,6 +1,11 @@
+pub mod nets;
+
+mod rollndiff;
+
+pub use self::rollndiff::*;
+
 use definitions::*;
-use std::collections::{BTreeMap, HashMap, VecDeque};
-use std;
+use std::collections::{BTreeMap, VecDeque};
 use ggez::*;
 use ggez::graphics::*;
 use std::f32;
@@ -36,9 +41,11 @@ impl GraphLine {
             self.current_value = (x, y);
             self.max_value = self.max_value.max(y);
 
-            if self.draw_shadow && y > 0f32 {
-                self.shadow.push_back((x, y));
-                if self.shadow.len() > 100 {
+            if self.draw_shadow {
+                if y >= 0f32 {
+                    self.shadow.push_back((x, y));
+                }
+                if self.shadow.len() > 100 || y < 0f32 {
                     self.shadow.pop_front();
                 }
             }
@@ -128,12 +135,52 @@ pub struct PowerGraphData {
 }
 
 impl PowerGraphData {
-    pub fn new() -> PowerGraphData {
+    pub fn new(rpm_step: i32) -> PowerGraphData {
         PowerGraphData {
-            throttle: GraphLine::new(10, false, false),
-            torque: GraphLine::new(10, true, true),
-            power: GraphLine::new(10, true, true),
+            throttle: GraphLine::new(rpm_step, false, false),
+            torque: GraphLine::new(rpm_step, true, true),
+            power: GraphLine::new(rpm_step, true, true),
         }
+    }
+
+    pub fn draw(
+        &mut self,
+        ctx: &mut Context,
+        screen_height: f32,
+        screen_width: f32,
+        max_rpm: i32,
+    ) -> GameResult<()> {
+        //net
+        let graph_height = self.power.max_value.max(self.torque.max_value) * 1.2;
+
+        let throttle_color = Color::from_rgb(147, 197, 67);
+        let torque_color = Color::from_rgb(67, 67, 197);
+        let torque_dot = Color::from_rgb(255, 201, 14);
+        let hp_color = Color::from_rgb(197, 67, 67);
+        let hp_dot = Color::from_rgb(86, 226, 86);
+
+        let x_scale = screen_width / max_rpm as f32;
+        let y_scale = screen_height / graph_height;
+        let power_scale = Point2::new(x_scale, y_scale);
+
+        self.throttle.draw(
+            ctx,
+            throttle_color,
+            throttle_color,
+            screen_height,
+            Point2::new(x_scale, screen_height * 0.95),
+        )?;
+        self.torque.draw(
+            ctx,
+            torque_color,
+            torque_dot,
+            screen_height,
+            power_scale.clone(),
+        )?;
+        self.power
+            .draw(ctx, hp_color, hp_dot, screen_height, power_scale.clone())?;
+
+        Ok(())
     }
 }
 
