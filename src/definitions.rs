@@ -22,7 +22,7 @@ pub enum Tyre {
 }
 
 #[repr(u32)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GameState {
   GAME_EXITED,
   GAME_FRONT_END,

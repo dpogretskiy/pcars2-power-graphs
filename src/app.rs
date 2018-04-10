@@ -50,11 +50,8 @@ impl PC2App {
         let numeric_text_cache = NumericTextCache::new(ctx, &font);
         let optimized_text = OptimizedText::new(fragments);
 
-        let nets_and_borders = NetsAndBorders::new(
-            ctx,
-            &Point2::new(screen_width, screen_height),
-            &numeric_text_cache,
-        );
+        let nets_and_borders =
+            NetsAndBorders::new(ctx, &Point2::new(screen_width, screen_height), &font);
 
         // "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
         PC2App {
@@ -141,12 +138,11 @@ impl event::EventHandler for PC2App {
                 let diff_percent = (left_wheel_rps.abs().min(right_wheel_rps.abs()))
                     / (left_wheel_rps.abs().max(right_wheel_rps.abs()));
 
-                if local_copy.mCurrentTime != 0f32 {
+                if local_copy.mGameState == GameState::GAME_INGAME_PLAYING {
                     self.diff_graph.add(diff_percent, self.start_time.elapsed());
                 }
 
                 let inputs = Inputs::from(&local_copy);
-                let x_velocity = local_copy.mLocalVelocity.x;
 
                 let tyre_rps = ((tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
                     + tyre_rps_arr.data[Tyre::TyreRearRight as usize])
@@ -154,8 +150,6 @@ impl event::EventHandler for PC2App {
                     .abs();
 
                 let ratio = current_rpm_f32 / tyre_rps;
-
-                let acceleration = -local_copy.mLocalAcceleration.z;
 
                 if self.stupid_graphs.max_ratio < ratio {
                     self.stupid_graphs.max_ratio = ratio;
@@ -182,27 +176,23 @@ impl event::EventHandler for PC2App {
                     self.stupid_graphs.max_rotations_rpm = current_rpm;
                 }
 
-                let mut ratio_struct = Ratio {
-                    gear: self.current_gear,
-                    acceleration,
-                    ratio,
-                    velocity: tyre_rps,
-                    x_velocity,
-                    rpm: current_rpm_f32,
-                    differential,
-                    inputs: inputs.clone(),
-                };
-
                 let entry = self.stupid_graphs
                     .ratios
                     .entry(self.current_gear)
-                    .or_insert(ratio_struct.clone());
+                    .or_insert(Ratio {
+                        gear: self.current_gear,
+                        ratio,
+                        acceleration: GraphLine::new(1, false, true),
+                        max_speed: 300,
+                        differential,
+                    });
 
                 if inputs.throttle > 0.2 && inputs.clutch <= f32::EPSILON
                     && inputs.brake <= f32::EPSILON
                     && (differential <= entry.differential)
                 {
-                    std::mem::swap(entry, &mut ratio_struct);
+                    entry.differential = differential;
+                    entry.ratio = ratio;
                 }
             }
         }
@@ -215,19 +205,20 @@ impl event::EventHandler for PC2App {
         graphics::set_color(ctx, Color::from_rgb(18, 31, 52))?;
         graphics::clear(ctx);
 
-        self.power_data
-            .draw(ctx, self.screen_height, 600f32, self.max_rpm)?;
-        //net
+        let screen_size = Point2::new(self.screen_width, self.screen_height);
 
+        //net
         let graph_height = self.power_data
             .power
             .max_value
             .max(self.power_data.torque.max_value) * 1.2;
 
-        let screen_size = Point2::new(self.screen_width, self.screen_height);
-
         self.nets_and_borders
-            .draw(ctx, self.max_rpm, graph_height, &screen_size)?;
+            .draw(ctx, self.max_rpm, graph_height, &screen_size, &self.numeric_text_cache)?;
+
+        //power
+        self.power_data
+            .draw(ctx, self.screen_height, self.screen_width, self.max_rpm, graph_height)?;
 
         //text
         let world_y = if self.local_copy.mViewedParticipantIndex >= 0 {
