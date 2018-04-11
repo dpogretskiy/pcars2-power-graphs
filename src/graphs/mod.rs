@@ -23,10 +23,17 @@ pub struct GraphLine {
     pub current_value: (i32, f32),
     pub max_value: f32,
     pub cache: Option<Mesh>,
+    region: GraphRegion,
+}
+
+pub enum GraphRegion {
+    Left,
+    TopRight,
+    BottomRight,
 }
 
 impl GraphLine {
-    pub fn new(step: i32, draw_dot: bool, draw_shadow: bool) -> GraphLine {
+    pub fn new(step: i32, draw_dot: bool, draw_shadow: bool, region: GraphRegion) -> GraphLine {
         GraphLine {
             step,
             draw_shadow,
@@ -36,6 +43,7 @@ impl GraphLine {
             current_value: (0, 0f32),
             max_value: 1f32,
             cache: None,
+            region,
         }
     }
 
@@ -76,7 +84,7 @@ impl GraphLine {
                     .map(|(k, v)| {
                         let x = *k as f32 / max_values.x;
                         let y = v / max_values.y;
-                        scale_right_top(x, y, screen_size)
+                        self.scale_point(x, y, screen_size)
                     })
                     .collect();
 
@@ -101,7 +109,7 @@ impl GraphLine {
 
                 let x = self.current_value.0 as f32 / max_values.x;
                 let y = self.current_value.1 / max_values.y;
-                let dot = scale_right_top(x, y, screen_size);
+                let dot = self.scale_point(x, y, screen_size);
                 graphics::circle(ctx, DrawMode::Fill, dot, 3f32, 1f32)?;
             }
 
@@ -118,11 +126,11 @@ impl GraphLine {
                         let x = dot.0 as f32 / max_values.x;
                         let y = dot.1 / max_values.y;
 
-                        let point = scale_right_top(x, y, screen_size);
+                        let point = self.scale_point(x, y, screen_size);
 
                         let x = last_dot.0 as f32 / max_values.x;
                         let y = last_dot.1 / max_values.y;
-                        let last_point = scale_right_top(x, y, screen_size);
+                        let last_point = self.scale_point(x, y, screen_size);
 
                         graphics::line(ctx, &[point, last_point], 1f32)?;
 
@@ -132,6 +140,14 @@ impl GraphLine {
             }
         }
         Ok(())
+    }
+
+    pub fn scale_point(&self, x: f32, y: f32, screen_size: &Point2) -> Point2 {
+        match self.region {
+            GraphRegion::Left => scale_left(x, y, screen_size),
+            GraphRegion::TopRight => scale_right_top(x, y, screen_size),
+            GraphRegion::BottomRight => scale_right_bottom(x, y, screen_size),
+        }
     }
 }
 
@@ -144,9 +160,9 @@ pub struct PowerGraphData {
 impl PowerGraphData {
     pub fn new(rpm_step: i32) -> PowerGraphData {
         PowerGraphData {
-            throttle: GraphLine::new(rpm_step, false, false),
-            torque: GraphLine::new(rpm_step, true, true),
-            power: GraphLine::new(rpm_step, true, true),
+            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight),
+            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight),
+            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight),
         }
     }
 
@@ -158,7 +174,6 @@ impl PowerGraphData {
         max_rpm: i32,
         graph_height: f32,
     ) -> GameResult<()> {
-
         let throttle_color = Color::from_rgb(147, 197, 67);
         let torque_color = Color::from_rgb(67, 67, 197);
         let torque_dot = Color::from_rgb(255, 201, 14);

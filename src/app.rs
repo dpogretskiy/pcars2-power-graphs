@@ -8,6 +8,9 @@ use graphs::*;
 use graphs::nets::*;
 use util::*;
 
+const MAGIC_GEAR_RATIO: f32 = 9.534739389568648;
+const MAGIC_SPEED: f32 = 0.004787775304098672;
+
 pub struct PC2App {
     shared_data: *const SharedMemory,
     local_copy: SharedMemory,
@@ -20,7 +23,6 @@ pub struct PC2App {
     current_track: String,
     power_data: PowerGraphData,
     stupid_graphs: StupidGraphData,
-    roll_graph: RollGraphData,
     diff_graph: DiffGraphData,
     optimized_text: OptimizedText,
     numeric_text_cache: NumericTextCache,
@@ -45,7 +47,6 @@ impl PC2App {
             graphics::Text::new(ctx, "RPM: ", &font).unwrap(),
             graphics::Text::new(ctx, "HP: ", &font).unwrap(),
             graphics::Text::new(ctx, "GR: ", &font).unwrap(),
-            graphics::Text::new(ctx, "Y: ", &font).unwrap(),
         ];
         let numeric_text_cache = NumericTextCache::new(ctx, &font);
         let optimized_text = OptimizedText::new(fragments);
@@ -64,7 +65,6 @@ impl PC2App {
             max_rpm: 1,
             power_data: PowerGraphData::new(rpm_step),
             stupid_graphs: StupidGraphData::new(),
-            roll_graph: RollGraphData {},
             diff_graph: DiffGraphData::new(),
             current_car: String::new(),
             current_track: String::new(),
@@ -103,6 +103,7 @@ impl event::EventHandler for PC2App {
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new(self.rpm_step);
             self.stupid_graphs = StupidGraphData::new();
+            self.diff_graph = DiffGraphData::new();
 
             let mut title = car_name;
             title.push_str(" @ ");
@@ -110,17 +111,19 @@ impl event::EventHandler for PC2App {
             graphics::get_window_mut(_ctx).set_title(&title).unwrap();
         }
 
+        let inputs = Inputs::from(&local_copy);
         let current_rpm_f32 = local_copy.mRpm;
         let current_rpm = current_rpm_f32 as i32;
         let rpm = current_rpm - current_rpm % self.rpm_step;
         self.current_rpm = current_rpm;
-        let throttle = local_copy.mThrottle;
         let torque = local_copy.mEngineTorque;
         let power = (torque * current_rpm_f32 / 9548.8) / 0.7457;
 
-        let currents_only = !(throttle > 0.9999 && local_copy.mClutch < 0.0001);
+        let currents_only = !(inputs.throttle > 0.9999 && inputs.clutch < 0.0001);
 
-        self.power_data.throttle.add(rpm, throttle, currents_only);
+        self.power_data
+            .throttle
+            .add(rpm, inputs.throttle, currents_only);
         self.power_data.torque.add(rpm, torque, currents_only);
         self.power_data.power.add(rpm, power, currents_only);
 
@@ -133,16 +136,12 @@ impl event::EventHandler for PC2App {
                 let left_wheel_rps = tyre_rps_arr.data[Tyre::TyreRearLeft as usize];
                 let right_wheel_rps = tyre_rps_arr.data[Tyre::TyreRearRight as usize];
 
-                let differential = (left_wheel_rps - right_wheel_rps).abs();
-
                 let diff_percent = (left_wheel_rps.abs().min(right_wheel_rps.abs()))
                     / (left_wheel_rps.abs().max(right_wheel_rps.abs()));
 
                 if local_copy.mGameState == GameState::GAME_INGAME_PLAYING {
                     self.diff_graph.add(diff_percent, self.start_time.elapsed());
                 }
-
-                let inputs = Inputs::from(&local_copy);
 
                 let tyre_rps = ((tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
                     + tyre_rps_arr.data[Tyre::TyreRearRight as usize])
@@ -151,8 +150,34 @@ impl event::EventHandler for PC2App {
 
                 let ratio = current_rpm_f32 / tyre_rps;
 
-                if self.stupid_graphs.max_ratio < ratio {
-                    self.stupid_graphs.max_ratio = ratio;
+                let gear_ratio = ratio / MAGIC_GEAR_RATIO;
+
+                // let factual_speed = local_copy.mSpeed * 3.6;
+
+                // let supposed_wheel_diameter =
+                //     gear_ratio * factual_speed / (MAGIC_SPEED * current_rpm_f32);
+
+                // let supposed_speed = (MAGIC_SPEED * current_rpm_f32 * 28f32) / gear_ratio;
+
+                // let velocity_sum = local_copy.mLocalVelocity.length() * 3.6;
+                let velocity_z = -local_copy.mLocalVelocity.z * 3.6;
+
+                if velocity_z > 0f32 {
+                    self.stupid_graphs.add_ggv(
+                        self.current_gear,
+                        velocity_z,
+                        local_copy.mLocalAcceleration.x,
+                        local_copy.mLocalAcceleration.z,
+                    );
+                }
+
+                // println!(
+                //     "Gear: {:.*} Speedo: {:.*} Speed?: {:.*} Wheel?: {:.*} VeloSum: {:.*} VeloZ: {:.*}",
+                //     2, gear_ratio, 2, factual_speed, 2, supposed_speed, 2, supposed_wheel_diameter, 2, velocity_sum, 2, velocity_z
+                // );
+
+                if self.stupid_graphs.max_ratio < gear_ratio {
+                    self.stupid_graphs.max_ratio = gear_ratio;
                 }
 
                 //we want it to be minimal ratio gear also, so some lifting is going on here :)
@@ -181,18 +206,18 @@ impl event::EventHandler for PC2App {
                     .entry(self.current_gear)
                     .or_insert(Ratio {
                         gear: self.current_gear,
-                        ratio,
-                        acceleration: GraphLine::new(1, false, true),
+                        ratio: gear_ratio,
+                        acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
                         max_speed: 300,
-                        differential,
+                        differential: diff_percent,
                     });
 
                 if inputs.throttle > 0.2 && inputs.clutch <= f32::EPSILON
                     && inputs.brake <= f32::EPSILON
-                    && (differential <= entry.differential)
+                    && (diff_percent <= entry.differential)
                 {
-                    entry.differential = differential;
-                    entry.ratio = ratio;
+                    entry.differential = diff_percent;
+                    entry.ratio = gear_ratio;
                 }
             }
         }
@@ -213,22 +238,24 @@ impl event::EventHandler for PC2App {
             .max_value
             .max(self.power_data.torque.max_value) * 1.2;
 
-        self.nets_and_borders
-            .draw(ctx, self.max_rpm, graph_height, &screen_size, &self.numeric_text_cache)?;
+        self.nets_and_borders.draw(
+            ctx,
+            self.max_rpm,
+            graph_height,
+            &screen_size,
+            &self.numeric_text_cache,
+        )?;
 
         //power
-        self.power_data
-            .draw(ctx, self.screen_height, self.screen_width, self.max_rpm, graph_height)?;
+        self.power_data.draw(
+            ctx,
+            self.screen_height,
+            self.screen_width,
+            self.max_rpm,
+            graph_height,
+        )?;
 
         //text
-        let world_y = if self.local_copy.mViewedParticipantIndex >= 0 {
-            let vec = &self.local_copy.mParticipantInfo.data
-                [self.local_copy.mViewedParticipantIndex as usize]
-                .mWorldPosition;
-            vec.y
-        } else {
-            0f32
-        };
 
         let values = vec![
             self.power_data.power.max_value as i32,
@@ -241,7 +268,6 @@ impl event::EventHandler for PC2App {
                 .get(&self.current_gear)
                 .map(|a| a.ratio.clone())
                 .unwrap_or(0f32) as i32,
-            world_y as i32,
         ];
 
         self.stupid_graphs.draw(
@@ -254,8 +280,6 @@ impl event::EventHandler for PC2App {
 
         self.optimized_text
             .draw_num_cache(ctx, &values, &self.numeric_text_cache)?;
-
-        self.roll_graph.draw(ctx, &self.local_copy, &screen_size)?;
 
         self.diff_graph.draw(ctx, &screen_size)?;
 

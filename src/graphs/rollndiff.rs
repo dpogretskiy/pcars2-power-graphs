@@ -7,43 +7,7 @@ use std::collections::VecDeque;
 
 pub struct RollGraphData {}
 
-impl RollGraphData {
-    pub fn draw(
-        &self,
-        ctx: &mut Context,
-        sm: &SharedMemory,
-        screen_size: &Point2,
-    ) -> GameResult<()> {
-        // let center = Point2::new(screen_size.x * 0.8, screen_size.y * 0.35);
-
-        // let width = 100.0;
-        // let height = 50.0;
-
-        // let mult = 500f32;
-
-        // let (tyre_yf, tyre_yr) = linearize(&sm.mTyreY, width, height, mult);
-
-        // let mesh = MeshBuilder::new()
-        //     .line(&tyre_yf, 2f32)
-        //     .line(&tyre_yr, 2f32)
-        //     .build(ctx)?;
-        // graphics::set_color(ctx, Color::from_rgb(200, 150, 120))?;
-        // mesh.draw(ctx, center, 0f32)?;
-
-        // let (tyre_stf, tyre_str) = linearize(&sm.mSuspensionTravel, width, height, -mult);
-
-        // let mesh = MeshBuilder::new()
-        //     .line(&tyre_stf, 2f32)
-        //     .line(&tyre_str, 2f32)
-        //     .build(ctx)?;
-        // graphics::set_color(ctx, Color::from_rgb(255, 100, 0))?;
-        // mesh.draw(ctx, center, 0f32)?;
-
-        Ok(())
-    }
-}
-
-fn linearize(
+fn _linearize(
     tyre_array: &TyresArray<f32>,
     width: f32,
     height: f32,
