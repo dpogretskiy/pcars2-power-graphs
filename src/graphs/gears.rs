@@ -88,7 +88,7 @@ impl StupidGraphData {
                 let (gear, mut ratio) = r;
                 let alpha = *gear as f32 / max_gear as f32;
 
-                let x_max = (self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32));
+                let x_max = (self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32))                   ;
 
                 ratio.acceleration.draw(
                     ctx,
@@ -117,8 +117,8 @@ impl StupidGraphData {
                     //     screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
                     // );
                     let dot = scale_left(
-                        power.torque.current_value.0 as f32 / x_scale,
-                        (power.torque.current_value.1 * ratio.ratio) / y_scale,
+                        power.torque.current_value.0 as f32 / x_max,
+                        (power.torque.current_value.1 * ratio.ratio) / y_max,
                         screen_size,
                     );
                     graphics::set_color(ctx, Color::from_rgb(255, 140, 0))?;
