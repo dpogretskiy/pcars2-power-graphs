@@ -1,6 +1,7 @@
 use ggez::*;
 use ggez::graphics::*;
 use super::*;
+use super::nets::*;
 
 pub struct Ratio {
     pub gear: i32,
@@ -25,18 +26,20 @@ impl StupidGraphData {
             ratios: BTreeMap::new(),
             lateral_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
             max_rotations: 1f32,
-            max_rotations_gear: 1i32,
-            max_rotations_rpm: 1i32,
+            max_rotations_gear: 1,
+            max_rotations_rpm: 1,
             max_ratio: 1f32,
         }
     }
 
     pub fn add_ggv(&mut self, gear: i32, speed: f32, lateral: f32, longtitudal: f32) {
         self.lateral_acceleration
-            .add(speed as i32, lateral.abs(), false);
+            .add(speed as i32, lateral.abs() / 9.8, false);
         let mut geared = self.ratios.get_mut(&gear);
         if let Some(ref mut g) = geared {
-            g.acceleration.add(speed as i32, -longtitudal, false);
+            if longtitudal < 0 {
+                g.acceleration.add(speed as i32, -longtitudal / 9.8, false);
+            }
         }
     }
 
@@ -67,7 +70,7 @@ impl StupidGraphData {
                 .map(|x| x.1.ratio)
                 .unwrap_or(10f32);
 
-            let y_scale = screen_size.y * 0.95 / (max_ratio * power.torque.max_value);
+            let y_max = max_ratio * power.torque.max_value * 1.1;
 
             let mut color = WHITE;
 
@@ -85,23 +88,23 @@ impl StupidGraphData {
                 let (gear, mut ratio) = r;
                 let alpha = *gear as f32 / max_gear as f32;
 
-                let x_scale = screen_size.x
-                    / (self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32)
-                        * ratio.ratio);
+                let x_scale = self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32)
+                    * ratio.ratio;
 
                 ratio.acceleration.draw(
                     ctx,
                     Color::from_rgb(150, 0, 0),
-                    Color::from_rgb(150, 50, 97),
+                    Color::from_rgb(150, 150, 0),
                     screen_size,
                     &Point2::new(max_speed, 40f32),
                 )?;
 
                 let mut points = vec![];
                 for (r, t) in power.torque.values.iter() {
-                    points.push(Point2::new(
-                        *r as f32 * x_scale,
-                        screen_size.y - y_scale * t * ratio.ratio,
+                    points.push(scale_left(
+                        *r as f32 / x_scale,
+                        (t * ratio.ratio) / y_scale,
+                        screen_size,
                     ));
                 }
 
@@ -110,9 +113,14 @@ impl StupidGraphData {
                 graphics::line(ctx, &points, 2f32)?;
 
                 if ratio.gear == current_gear {
-                    let dot = Point2::new(
-                        x_scale * power.torque.current_value.0 as f32,
-                        screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
+                    // let dot = Point2::new(
+                    //     x_scale * power.torque.current_value.0 as f32,
+                    //     screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
+                    // );
+                    let dot = scale_left(
+                        power.torque.current_value.0 as f32 / x_scale,
+                        (power.torque.current_value.1 * ratio.ratio) / y_scale,
+                        screen_size,
                     );
                     graphics::set_color(ctx, Color::from_rgb(255, 140, 0))?;
                     graphics::circle(ctx, DrawMode::Fill, dot, 3f32, 1f32)?;
