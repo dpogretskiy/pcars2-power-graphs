@@ -1,7 +1,7 @@
-use ggez::*;
-use ggez::graphics::*;
-use super::*;
 use super::nets::*;
+use super::*;
+use ggez::graphics::*;
+use ggez::*;
 
 pub struct Ratio {
     pub gear: i32,
@@ -88,8 +88,8 @@ impl StupidGraphData {
                 let (gear, mut ratio) = r;
                 let alpha = *gear as f32 / max_gear as f32;
 
-                let x_scale = self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32)
-                    * ratio.ratio;
+                let x_max = (self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32))
+                    / ratio.ratio;
 
                 ratio.acceleration.draw(
                     ctx,
@@ -102,8 +102,8 @@ impl StupidGraphData {
                 let mut points = vec![];
                 for (r, t) in power.torque.values.iter() {
                     points.push(scale_left(
-                        *r as f32 / x_scale,
-                        (t * ratio.ratio) / y_scale,
+                        *r as f32 / x_max,
+                        (t * ratio.ratio) / y_max,
                         screen_size,
                     ));
                 }
