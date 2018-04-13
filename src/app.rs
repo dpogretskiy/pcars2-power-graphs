@@ -149,8 +149,16 @@ impl event::EventHandler for PC2App {
                     .abs();
 
                 let ratio = current_rpm_f32 / tyre_rps;
-
                 let gear_ratio = ratio / MAGIC_GEAR_RATIO;
+
+                self.stupid_graphs.update(
+                    self.current_gear,
+                    current_rpm_f32,
+                    diff_percent,
+                    tyre_rps,
+                    gear_ratio,
+                    &inputs,
+                );
 
                 // let factual_speed = local_copy.mSpeed * 3.6;
 
@@ -161,7 +169,6 @@ impl event::EventHandler for PC2App {
 
                 // let velocity_sum = local_copy.mLocalVelocity.length() * 3.6;
                 let velocity_z = -local_copy.mLocalVelocity.z * 3.6;
-
                 if velocity_z > 0f32 {
                     self.stupid_graphs.add_ggv(
                         self.current_gear,
@@ -169,55 +176,6 @@ impl event::EventHandler for PC2App {
                         local_copy.mLocalAcceleration.x,
                         local_copy.mLocalAcceleration.z,
                     );
-                }
-
-                // println!(
-                //     "Gear: {:.*} Speedo: {:.*} Speed?: {:.*} Wheel?: {:.*} VeloSum: {:.*} VeloZ: {:.*}",
-                //     2, gear_ratio, 2, factual_speed, 2, supposed_speed, 2, supposed_wheel_diameter, 2, velocity_sum, 2, velocity_z
-                // );
-
-                if self.stupid_graphs.max_ratio < gear_ratio {
-                    self.stupid_graphs.max_ratio = gear_ratio;
-                }
-
-                //we want it to be minimal ratio gear also, so some lifting is going on here :)
-                let min_known_ratio = self.stupid_graphs
-                    .ratios
-                    .iter()
-                    .min_by_key(|x| x.1.ratio as i32)
-                    .map(|x| x.1.ratio.clone());
-
-                if let Some(min_ratio) = min_known_ratio {
-                    if self.stupid_graphs.max_rotations_gear != self.current_gear
-                        && ratio < min_ratio
-                    {
-                        self.stupid_graphs.max_rotations = tyre_rps;
-                        self.stupid_graphs.max_rotations_gear = self.current_gear;
-                        self.stupid_graphs.max_rotations_rpm = current_rpm;
-                    }
-                } else if self.stupid_graphs.max_rotations < tyre_rps {
-                    self.stupid_graphs.max_rotations = tyre_rps;
-                    self.stupid_graphs.max_rotations_gear = self.current_gear;
-                    self.stupid_graphs.max_rotations_rpm = current_rpm;
-                }
-
-                let entry = self.stupid_graphs
-                    .ratios
-                    .entry(self.current_gear)
-                    .or_insert(Ratio {
-                        gear: self.current_gear,
-                        ratio: gear_ratio,
-                        acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
-                        max_speed: 300,
-                        differential: diff_percent,
-                    });
-
-                if inputs.throttle > 0.2 && inputs.clutch <= f32::EPSILON
-                    && inputs.brake <= f32::EPSILON
-                    && (diff_percent <= entry.differential)
-                {
-                    entry.differential = diff_percent;
-                    entry.ratio = gear_ratio;
                 }
             }
         }
@@ -242,6 +200,7 @@ impl event::EventHandler for PC2App {
             ctx,
             self.max_rpm,
             graph_height,
+            self.stupid_graphs.max_speed,
             &screen_size,
             &self.numeric_text_cache,
         )?;
@@ -273,7 +232,7 @@ impl event::EventHandler for PC2App {
         self.stupid_graphs.draw(
             ctx,
             &self.power_data,
-            &Point2::new(600f32, self.screen_height),
+            &Point2::new(self.screen_width, self.screen_height),
             self.current_gear,
             self.max_rpm,
         )?;

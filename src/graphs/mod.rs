@@ -79,17 +79,19 @@ impl GraphLine {
     ) -> GameResult<()> {
         if self.values.len() > 1 {
             if self.cache.is_none() {
-                let v: Vec<Point2> = self.values
-                    .iter()
-                    .map(|(k, v)| {
-                        let x = *k as f32 / max_values.x;
-                        let y = v / max_values.y;
-                        self.scale_point(x, y, screen_size)
-                    })
-                    .collect();
+                let mut vec: Vec<Point2> = Vec::with_capacity(self.values.len());
+                self.values.iter().for_each(|(k, v)| {
+                    let x = *k as f32 / max_values.x;
+                    let y = v / max_values.y;
+                    if x > 0f32 && x < 1f32 && y > 0f32 && y < 1f32 {
+                        vec.push(self.scale_point(x, y, screen_size));
+                    }
+                });
 
-                let mesh = Mesh::new_line(ctx, &v, 2f32)?;
-                self.cache = Some(mesh);
+                if vec.len() > 1 {
+                    let mesh = Mesh::new_line(ctx, &vec, 2f32)?;
+                    self.cache = Some(mesh);
+                }
             }
 
             // graphics::set_color(ctx, line_color)?;

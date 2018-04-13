@@ -6,18 +6,17 @@ use ggez::*;
 pub struct Ratio {
     pub gear: i32,
     pub ratio: f32,
-    pub acceleration: GraphLine,
-    pub max_speed: i32,
     pub differential: f32,
 }
 
 pub struct StupidGraphData {
     pub ratios: BTreeMap<i32, Ratio>,
-    pub lateral_acceleration: GraphLine,
     pub max_rotations: f32,
-    pub max_rotations_gear: i32,
-    pub max_rotations_rpm: i32,
-    pub max_ratio: f32,
+    pub max_rotations_rpm: f32,
+    pub lateral_acceleration: GraphLine,
+    pub longtitudal_acceleration: GraphLine,
+    pub braking_acceleration: GraphLine,
+    pub max_speed: f32,
 }
 
 impl StupidGraphData {
@@ -25,20 +24,55 @@ impl StupidGraphData {
         StupidGraphData {
             ratios: BTreeMap::new(),
             lateral_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
+            longtitudal_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
+            braking_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
             max_rotations: 1f32,
-            max_rotations_gear: 1,
-            max_rotations_rpm: 1,
-            max_ratio: 1f32,
+            max_rotations_rpm: 0f32,
+            max_speed: 300f32,
         }
     }
 
-    pub fn add_ggv(&mut self, gear: i32, speed: f32, lateral: f32, longtitudal: f32) {
-        self.lateral_acceleration
-            .add(speed as i32, lateral.abs() / 9.8, false);
-        let mut geared = self.ratios.get_mut(&gear);
-        if let Some(ref mut g) = geared {
-            if longtitudal < 0 {
-                g.acceleration.add(speed as i32, -longtitudal / 9.8, false);
+    pub fn update(
+        &mut self,
+        gear: i32,
+        rpm: f32,
+        diff_percent: f32,
+        tyre_rps: f32,
+        gear_ratio: f32,
+        inputs: &Inputs,
+    ) {
+        if self.max_rotations < tyre_rps {
+            self.max_rotations = tyre_rps;
+            self.max_rotations_rpm = rpm;
+        }
+
+        let entry = self.ratios.entry(gear).or_insert(Ratio {
+            gear,
+            ratio: gear_ratio,
+            differential: diff_percent,
+        });
+
+        if inputs.throttle > 0.2 && inputs.clutch == 0f32 && inputs.brake == 0f32 {
+            entry.differential = diff_percent;
+            entry.ratio = gear_ratio;
+        }
+    }
+
+    pub fn add_ggv(&mut self, _gear: i32, speed: f32, lateral: f32, longtitudal: f32) {
+        if (lateral.abs() / 9.8) < 10f32 {
+            self.lateral_acceleration
+                .add(speed as i32, lateral.abs() / 9.8, false);
+        };
+        if speed > self.max_speed {
+            self.max_speed = speed;
+        }
+        if (longtitudal.abs() / 9.8) < 10f32 {
+            if longtitudal < 0f32 {
+                self.longtitudal_acceleration
+                    .add(speed as i32, -longtitudal / 9.8, false);
+            } else if longtitudal > 0f32 {
+                self.braking_acceleration
+                    .add(speed as i32, longtitudal / 9.8, false);
             }
         }
     }
@@ -58,45 +92,59 @@ impl StupidGraphData {
                 .unwrap()
                 .clone();
 
+            let ord_f32 = |x: &f32, y: &f32| -> Ordering {
+                if x <= y {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            };
+
             let max_ratio = self.ratios
                 .iter()
-                .max_by(|x, y| {
-                    if x.1.ratio <= y.1.ratio {
-                        Ordering::Less
-                    } else {
-                        Ordering::Greater
-                    }
-                })
-                .map(|x| x.1.ratio)
-                .unwrap_or(10f32);
+                .max_by(|x, y| ord_f32(&x.1.ratio, &y.1.ratio))
+                .map(|x| x.1.ratio.clone())
+                .unwrap();
+
+            let min_ratio = self.ratios
+                .iter()
+                .min_by(|x, y| ord_f32(&x.1.ratio, &y.1.ratio))
+                .map(|x| x.1.ratio.clone())
+                .unwrap();
 
             let y_max = max_ratio * power.torque.max_value * 1.1;
 
             let mut color = WHITE;
 
-            let max_speed = 300f32;
-
             self.lateral_acceleration.draw(
                 ctx,
-                Color::from_rgb(50, 150, 50),
-                Color::from_rgb(50, 50, 150),
+                Color::from_rgb(128, 0, 255),
+                Color::from_rgb(177, 100, 255),
                 screen_size,
-                &Point2::new(max_speed, 40f32),
+                &Point2::new(self.max_speed, 10f32),
+            )?;
+
+            self.longtitudal_acceleration.draw(
+                ctx,
+                Color::from_rgb(34, 177, 76),
+                Color::from_rgb(128, 255, 0),
+                screen_size,
+                &Point2::new(self.max_speed, 10f32),
+            )?;
+
+            self.braking_acceleration.draw(
+                ctx,
+                Color::from_rgb(236, 87, 15),
+                Color::from_rgb(250, 0, 0),
+                screen_size,
+                &Point2::new(self.max_speed, 10f32),
             )?;
 
             for r in self.ratios.iter_mut() {
                 let (gear, mut ratio) = r;
                 let alpha = *gear as f32 / max_gear as f32;
 
-                let x_max = (self.max_rotations * (max_rpm as f32 / self.max_rotations_rpm as f32))                   ;
-
-                ratio.acceleration.draw(
-                    ctx,
-                    Color::from_rgb(150, 0, 0),
-                    Color::from_rgb(150, 150, 0),
-                    screen_size,
-                    &Point2::new(max_speed, 40f32),
-                )?;
+                let x_max = max_rpm as f32 / min_ratio;
 
                 let mut points = vec![];
                 for (r, t) in power.torque.values.iter() {
@@ -117,7 +165,7 @@ impl StupidGraphData {
                     //     screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
                     // );
                     let dot = scale_left(
-                        power.torque.current_value.0 as f32 / x_max,
+                        (power.torque.current_value.0 as f32 / ratio.ratio) / x_max,
                         (power.torque.current_value.1 * ratio.ratio) / y_max,
                         screen_size,
                     );
