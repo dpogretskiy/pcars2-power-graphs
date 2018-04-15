@@ -8,4 +8,4 @@ winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryap
 ggez = "0.4"
 
 [profile.release]
-debug = false
+debug = true

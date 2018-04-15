@@ -9,7 +9,7 @@ use graphs::nets::*;
 use util::*;
 
 const MAGIC_GEAR_RATIO: f32 = 9.534739389568648;
-const MAGIC_SPEED: f32 = 0.004787775304098672;
+const _MAGIC_SPEED: f32 = 0.004787775304098672;
 
 pub struct PC2App {
     shared_data: *const SharedMemory,

@@ -23,9 +23,9 @@ impl StupidGraphData {
     pub fn new() -> StupidGraphData {
         StupidGraphData {
             ratios: BTreeMap::new(),
-            lateral_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
-            longtitudal_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
-            braking_acceleration: GraphLine::new(1, false, true, GraphRegion::Left),
+            lateral_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
+            longtitudal_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
+            braking_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
             max_rotations: 1f32,
             max_rotations_rpm: 0f32,
             max_speed: 300f32,

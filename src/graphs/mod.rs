@@ -24,6 +24,7 @@ pub struct GraphLine {
     pub max_value: f32,
     pub cache: Option<Mesh>,
     region: GraphRegion,
+    smoothening: usize,
 }
 
 pub enum GraphRegion {
@@ -33,7 +34,13 @@ pub enum GraphRegion {
 }
 
 impl GraphLine {
-    pub fn new(step: i32, draw_dot: bool, draw_shadow: bool, region: GraphRegion) -> GraphLine {
+    pub fn new(
+        step: i32,
+        draw_dot: bool,
+        draw_shadow: bool,
+        region: GraphRegion,
+        smoothening: usize,
+    ) -> GraphLine {
         GraphLine {
             step,
             draw_shadow,
@@ -44,6 +51,7 @@ impl GraphLine {
             max_value: 1f32,
             cache: None,
             region,
+            smoothening,
         }
     }
 
@@ -77,6 +85,52 @@ impl GraphLine {
         screen_size: &Point2,
         max_values: &Point2,
     ) -> GameResult<()> {
+        let severity = self.smoothening;
+
+        if self.values.len() > 1 {
+            if self.cache.is_none() {
+                let src: Vec<_> = self.values.iter().collect();
+                let len = src.len();
+
+                let mut vec: Vec<Point2> = Vec::with_capacity(src.len());
+
+                for i in 0..len {
+                    let (k, _) = src[i];
+                    let mut start = if i - severity > 0 { i - severity } else { len };
+                    let mut end = (i + severity).min(len);
+
+                    let mut sum = 0f32;
+
+                    for j in start..end {
+                        sum += src[j].1;
+                    }
+
+                    let avg = sum / (end - start) as f32;
+                    let x = *k as f32 / max_values.x;
+                    let y = avg / max_values.y;
+                    if x > 0f32 && x < 1f32 && y > 0f32 && y < 1f32 {
+                        vec.push(self.scale_point(x, y, screen_size));
+                    }
+                }
+
+                if vec.len() > 1 {
+                    let mesh = Mesh::new_line(ctx, &vec, 2f32)?;
+                    self.cache = Some(mesh)
+                }
+            }
+        }
+        self.draw_old(ctx, line_color, dot_color, screen_size, max_values)?;
+        Ok(())
+    }
+
+    pub fn draw_old(
+        &mut self,
+        ctx: &mut Context,
+        line_color: Color,
+        dot_color: Color,
+        screen_size: &Point2,
+        max_values: &Point2,
+    ) -> GameResult<()> {
         if self.values.len() > 1 {
             if self.cache.is_none() {
                 let mut vec: Vec<Point2> = Vec::with_capacity(self.values.len());
@@ -92,9 +146,7 @@ impl GraphLine {
                     let mesh = Mesh::new_line(ctx, &vec, 2f32)?;
                     self.cache = Some(mesh);
                 }
-            }
-
-            // graphics::set_color(ctx, line_color)?;
+            } // graphics::set_color(ctx, line_color)?;
             if let Some(ref cache) = self.cache {
                 cache.draw_ex(
                     ctx,
@@ -162,9 +214,9 @@ pub struct PowerGraphData {
 impl PowerGraphData {
     pub fn new(rpm_step: i32) -> PowerGraphData {
         PowerGraphData {
-            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight),
-            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight),
-            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight),
+            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight, 2),
+            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3),
+            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3),
         }
     }
 
