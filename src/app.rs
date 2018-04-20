@@ -119,7 +119,7 @@ impl event::EventHandler for PC2App {
         let torque = local_copy.mEngineTorque;
         let power = (torque * current_rpm_f32 / 9548.8) / 0.7457;
 
-        let currents_only = !(inputs.throttle > 0.9999 && inputs.clutch < 0.0001);
+        let currents_only = !(inputs.throttle == 1.0 && inputs.clutch == 0.0) || local_copy.mGear == 0;
 
         self.power_data
             .throttle

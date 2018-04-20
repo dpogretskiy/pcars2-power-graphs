@@ -113,7 +113,7 @@ impl GraphLine {
                 let src: Vec<_> = self.values.iter().collect();
                 let len = src.len();
 
-                let mut vec: Vec<Point2> = Vec::with_capacity(src.len());
+                let mut vec: Vec<Point2> = Vec::with_capacity(len);
 
                 for i in 0..len {
                     let (k, _) = src[i];
@@ -129,7 +129,7 @@ impl GraphLine {
                     let avg = sum / (end - start) as f32;
                     let x = *k as f32 / max_values.x;
                     let y = avg / max_values.y;
-                    if x >= 0f32 && x <= 1f32 && y >= 0f32 && y <= 1f32 {
+                    if x > 0f32 && x < 1f32 && y >= 0f32 && y < 1f32 {
                         vec.push(self.scale_point(x, y, screen_size));
                     }
                 }
@@ -235,9 +235,9 @@ pub struct PowerGraphData {
 impl PowerGraphData {
     pub fn new(rpm_step: i32) -> PowerGraphData {
         PowerGraphData {
-            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight, 2),
-            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3),
-            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3),
+            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight, 0).zero_on_current(false),
+            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3).zero_on_current(false),
+            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3).zero_on_current(false),
         }
     }
 
