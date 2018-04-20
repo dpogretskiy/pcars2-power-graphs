@@ -16,19 +16,24 @@ pub struct StupidGraphData {
     pub lateral_acceleration: GraphLine,
     pub longtitudal_acceleration: GraphLine,
     pub braking_acceleration: GraphLine,
-    pub max_speed: f32,
+    pub track_length: f32,
 }
 
 impl StupidGraphData {
-    pub fn new() -> StupidGraphData {
+    pub fn new(track_length: f32) -> StupidGraphData {
         StupidGraphData {
             ratios: BTreeMap::new(),
-            lateral_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
-            longtitudal_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
-            braking_acceleration: GraphLine::new(1, false, true, GraphRegion::Left, 5),
+            lateral_acceleration: GraphLine::new(3, false, true, GraphRegion::Left, 3)
+                .with_width(1f32),
+            longtitudal_acceleration: GraphLine::new(3, false, true, GraphRegion::Left, 3)
+                .with_width(1f32)
+                .zero_on_current(true),
+            braking_acceleration: GraphLine::new(3, false, true, GraphRegion::Left, 3)
+                .with_width(1f32)
+                .zero_on_current(true),
             max_rotations: 1f32,
             max_rotations_rpm: 0f32,
-            max_speed: 300f32,
+            track_length,
         }
     }
 
@@ -58,21 +63,39 @@ impl StupidGraphData {
         }
     }
 
-    pub fn add_ggv(&mut self, _gear: i32, speed: f32, lateral: f32, longtitudal: f32) {
+    pub fn add_ggv(
+        &mut self,
+        _gear: i32,
+        position: f32,
+        lateral: f32,
+        longtitudal: f32,
+        input: &Inputs,
+        crash_state: u32,
+    ) {
+        let crash = crash_state != 0;
+        let throttle = input.throttle > 0.01;
+        let brake = input.brake > 0.01;
+
         if (lateral.abs() / 9.8) < 10f32 {
             self.lateral_acceleration
-                .add(speed as i32, lateral.abs() / 9.8, false);
+                .add(position as i32, lateral.abs() / 9.8, crash);
         };
-        if speed > self.max_speed {
-            self.max_speed = speed;
+        if position > self.track_length {
+            self.track_length = position;
         }
         if (longtitudal.abs() / 9.8) < 10f32 {
             if longtitudal < 0f32 {
-                self.longtitudal_acceleration
-                    .add(speed as i32, -longtitudal / 9.8, false);
+                self.longtitudal_acceleration.add(
+                    position as i32,
+                    -longtitudal / 9.8,
+                    crash || !throttle,
+                );
+                self.braking_acceleration.add(position as i32, 0f32, false);
             } else if longtitudal > 0f32 {
                 self.braking_acceleration
-                    .add(speed as i32, longtitudal / 9.8, false);
+                    .add(position as i32, longtitudal / 9.8, crash || !brake);
+                self.longtitudal_acceleration
+                    .add(position as i32, 0f32, false);
             }
         }
     }
@@ -121,7 +144,7 @@ impl StupidGraphData {
                 Color::from_rgb(128, 0, 255),
                 Color::from_rgb(177, 100, 255),
                 screen_size,
-                &Point2::new(self.max_speed, 10f32),
+                &Point2::new(self.track_length, 10f32),
             )?;
 
             self.longtitudal_acceleration.draw(
@@ -129,7 +152,7 @@ impl StupidGraphData {
                 Color::from_rgb(34, 177, 76),
                 Color::from_rgb(128, 255, 0),
                 screen_size,
-                &Point2::new(self.max_speed, 10f32),
+                &Point2::new(self.track_length, 10f32),
             )?;
 
             self.braking_acceleration.draw(
@@ -137,7 +160,7 @@ impl StupidGraphData {
                 Color::from_rgb(236, 87, 15),
                 Color::from_rgb(250, 0, 0),
                 screen_size,
-                &Point2::new(self.max_speed, 10f32),
+                &Point2::new(self.track_length, 10f32),
             )?;
 
             for r in self.ratios.iter_mut() {

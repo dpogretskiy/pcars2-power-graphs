@@ -64,7 +64,7 @@ impl PC2App {
             current_rpm: 0,
             max_rpm: 1,
             power_data: PowerGraphData::new(rpm_step),
-            stupid_graphs: StupidGraphData::new(),
+            stupid_graphs: StupidGraphData::new(1000f32),
             diff_graph: DiffGraphData::new(),
             current_car: String::new(),
             current_track: String::new(),
@@ -102,7 +102,7 @@ impl event::EventHandler for PC2App {
             self.current_track = track_name.clone();
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new(self.rpm_step);
-            self.stupid_graphs = StupidGraphData::new();
+            self.stupid_graphs = StupidGraphData::new(local_copy.mTrackLength);
             self.diff_graph = DiffGraphData::new();
 
             let mut title = car_name;
@@ -168,13 +168,20 @@ impl event::EventHandler for PC2App {
                 // let supposed_speed = (MAGIC_SPEED * current_rpm_f32 * 28f32) / gear_ratio;
 
                 // let velocity_sum = local_copy.mLocalVelocity.length() * 3.6;
+
                 let velocity_z = -local_copy.mLocalVelocity.z * 3.6;
+
+                let ix = local_copy.mViewedParticipantIndex as usize;
+                let track_position = local_copy.mParticipantInfo.data[ix].mCurrentLapDistance;
+
                 if velocity_z > 0f32 {
                     self.stupid_graphs.add_ggv(
                         self.current_gear,
-                        velocity_z,
+                        track_position,
                         local_copy.mLocalAcceleration.x,
                         local_copy.mLocalAcceleration.z,
+                        &inputs,
+                        local_copy.mCrashState,
                     );
                 }
             }
@@ -200,7 +207,7 @@ impl event::EventHandler for PC2App {
             ctx,
             self.max_rpm,
             graph_height,
-            self.stupid_graphs.max_speed,
+            self.stupid_graphs.track_length,
             &screen_size,
             &self.numeric_text_cache,
         )?;

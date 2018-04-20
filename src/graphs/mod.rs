@@ -25,6 +25,8 @@ pub struct GraphLine {
     pub cache: Option<Mesh>,
     region: GraphRegion,
     smoothening: usize,
+    line_width: f32,
+    zoc: bool,
 }
 
 pub enum GraphRegion {
@@ -52,7 +54,21 @@ impl GraphLine {
             cache: None,
             region,
             smoothening,
+            line_width: 2f32,
+            zoc: false,
         }
+    }
+
+    pub fn with_width(self, width: f32) -> Self {
+        let mut s = self;
+        s.line_width = width;
+        s
+    }
+
+    pub fn zero_on_current(self, zoc: bool) -> Self {
+        let mut s = self;
+        s.zoc = zoc;
+        s
     }
 
     pub fn add(&mut self, x: i32, y: f32, current_only: bool) {
@@ -73,6 +89,11 @@ impl GraphLine {
                 let step_x = x - x % self.step;
                 let entry = self.values.entry(step_x).or_insert(y);
                 *entry = entry.max(y);
+            } else if self.zoc {
+                self.cache = None;
+                let step_x = x - x % self.step;
+                let entry = self.values.entry(step_x).or_insert(0f32);
+                *entry = entry.max(0f32);
             }
         }
     }
@@ -108,13 +129,13 @@ impl GraphLine {
                     let avg = sum / (end - start) as f32;
                     let x = *k as f32 / max_values.x;
                     let y = avg / max_values.y;
-                    if x > 0f32 && x < 1f32 && y > 0f32 && y < 1f32 {
+                    if x >= 0f32 && x <= 1f32 && y >= 0f32 && y <= 1f32 {
                         vec.push(self.scale_point(x, y, screen_size));
                     }
                 }
 
                 if vec.len() > 1 {
-                    let mesh = Mesh::new_line(ctx, &vec, 2f32)?;
+                    let mesh = Mesh::new_line(ctx, &vec, self.line_width)?;
                     self.cache = Some(mesh)
                 }
             }
@@ -143,7 +164,7 @@ impl GraphLine {
                 });
 
                 if vec.len() > 1 {
-                    let mesh = Mesh::new_line(ctx, &vec, 2f32)?;
+                    let mesh = Mesh::new_line(ctx, &vec, self.line_width)?;
                     self.cache = Some(mesh);
                 }
             } // graphics::set_color(ctx, line_color)?;

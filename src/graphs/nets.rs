@@ -100,7 +100,7 @@ impl NetsAndBorders {
         ).unwrap();
 
         let one_g_text = Text::new(ctx, "1g", font).unwrap();
-        let fifty_kmph_text = Text::new(ctx, "50km/h", font).unwrap();
+        let fifty_kmph_text = Text::new(ctx, "500m", font).unwrap();
 
         NetsAndBorders {
             region_borders,
@@ -119,7 +119,7 @@ impl NetsAndBorders {
         ctx: &mut Context,
         max_x: i32,
         max_y: f32,
-        max_speed: f32,
+        max_distance: f32,
         screen_size: &Point2,
         numeric_cache: &NumericTextCache,
     ) -> GameResult<()> {
@@ -233,9 +233,9 @@ impl NetsAndBorders {
             graphics::draw(ctx, &self.left_region_horizontal, dest, 0f32)?;
         }
 
-        for speed in (0..max_speed as i32).step_by(50) {
-            let x = speed as f32 / max_speed;
-            if speed == 50 {
+        for distance in (0..max_distance as i32).step_by(500) {
+            let x = distance as f32 / max_distance;
+            if distance == 500 {
                 let mut dest = scale_left(x, 0f32, screen_size);
                 dest.x += 2f32;
                 dest.y -= self.fifty_kmph_text.height() as f32 / 2f32 + 2f32;
