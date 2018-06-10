@@ -5,7 +5,7 @@ authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 
 [dependencies]
 winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryapi"] }
-ggez = "0.4"
+ggez = "0.4.3"
 strsim = "0.7.0"
 
 [profile.release]

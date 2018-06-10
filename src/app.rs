@@ -88,10 +88,15 @@ impl PC2App {
 
 impl event::EventHandler for PC2App {
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        let local_copy = unsafe { std::ptr::read_volatile(self.shared_data) };
-        let update_index = local_copy.mSequenceNumber;
+        let update_index = unsafe { std::ptr::read_volatile(&(*self.shared_data).mSequenceNumber) };
 
         if update_index % 2 != 0 || update_index == self.local_copy.mSequenceNumber {
+            return Ok(());
+        }
+
+        let local_copy = unsafe { std::ptr::read_volatile(self.shared_data) };
+
+        if local_copy.mSequenceNumber != update_index {
             return Ok(());
         }
 
@@ -198,10 +203,16 @@ impl event::EventHandler for PC2App {
         }
 
         self.local_copy = local_copy;
+
+        timer::yield_now();
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        if !timer::check_update_time(ctx, 30) {
+            return Ok(());
+        }
+
         graphics::set_color(ctx, Color::from_rgb(18, 31, 52))?;
         graphics::clear(ctx);
 
@@ -264,6 +275,7 @@ impl event::EventHandler for PC2App {
 
         graphics::present(ctx);
 
+        timer::yield_now();
         Ok(())
     }
 }
