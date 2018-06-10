@@ -1,11 +1,14 @@
 [package]
 name = "power-graph"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 
 [dependencies]
 winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryapi"] }
 ggez = "0.4"
+strsim = "0.7.0"
 
 [profile.release]
-debug = true
+debug = false 
+lto = true
+panic = 'abort'

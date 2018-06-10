@@ -1,11 +1,12 @@
+use cars::*;
 use definitions::*;
-use std;
-use ggez::*;
 use ggez::graphics::*;
+use ggez::*;
+use graphs::nets::*;
+use graphs::*;
+use std;
 use std::f32;
 use std::time::Instant;
-use graphs::*;
-use graphs::nets::*;
 use util::*;
 
 const MAGIC_GEAR_RATIO: f32 = 9.534739389568648;
@@ -27,6 +28,7 @@ pub struct PC2App {
     optimized_text: OptimizedText,
     numeric_text_cache: NumericTextCache,
     nets_and_borders: NetsAndBorders,
+    cars_info: AllCarsData,
     screen_width: f32,
     screen_height: f32,
 }
@@ -54,6 +56,8 @@ impl PC2App {
         let nets_and_borders =
             NetsAndBorders::new(ctx, &Point2::new(screen_width, screen_height), &font);
 
+        let cars_info = AllCarsData::new(font);
+
         // "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
         PC2App {
             shared_data: sm,
@@ -71,6 +75,7 @@ impl PC2App {
             screen_width,
             screen_height,
             numeric_text_cache,
+            cars_info,
             rpm_step,
             nets_and_borders,
         }
@@ -105,6 +110,10 @@ impl event::EventHandler for PC2App {
             self.stupid_graphs = StupidGraphData::new(local_copy.mTrackLength);
             self.diff_graph = DiffGraphData::new();
 
+            self.cars_info.set(&car_name);
+
+            let car_name = self.cars_info.good_name().unwrap_or(car_name);
+
             let mut title = car_name;
             title.push_str(" @ ");
             title.push_str(&track_name);
@@ -119,7 +128,8 @@ impl event::EventHandler for PC2App {
         let torque = local_copy.mEngineTorque;
         let power = (torque * current_rpm_f32 / 9548.8) / 0.7457;
 
-        let currents_only = !(inputs.throttle == 1.0 && inputs.clutch == 0.0) || local_copy.mGear == 0;
+        let currents_only =
+            !(inputs.throttle == 1.0 && inputs.clutch == 0.0) || local_copy.mGear == 0;
 
         self.power_data
             .throttle
@@ -246,6 +256,9 @@ impl event::EventHandler for PC2App {
 
         self.optimized_text
             .draw_num_cache(ctx, &values, &self.numeric_text_cache)?;
+
+        self.cars_info
+            .draw_from_right(ctx, &Point2::new(self.screen_width, 0f32))?;
 
         self.diff_graph.draw(ctx, &screen_size)?;
 

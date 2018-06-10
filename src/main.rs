@@ -3,23 +3,25 @@
 #![windows_subsystem = "windows"]
 
 extern crate ggez;
+extern crate strsim;
 extern crate winapi;
 
-pub mod definitions;
 pub mod app;
+pub mod cars;
+pub mod definitions;
 pub mod graphs;
 pub mod util;
 
-use definitions::*;
-use winapi::um::errhandlingapi::GetLastError;
-use winapi::um::memoryapi::*;
-use winapi::um::handleapi::*;
-use winapi::um::winnt::*;
-use std::mem;
-use ggez::*;
 use app::*;
-use std::path;
+use definitions::*;
+use ggez::*;
 use std::env;
+use std::mem;
+use std::path;
+use winapi::um::errhandlingapi::GetLastError;
+use winapi::um::handleapi::*;
+use winapi::um::memoryapi::*;
+use winapi::um::winnt::*;
 
 // pub const MAP_OBJECT_NAME: &str = "$pcars2$";
 pub const MAP_OBJECT_NAME: [u16; 9] = [36, 112, 99, 97, 114, 115, 50, 36, 0];
