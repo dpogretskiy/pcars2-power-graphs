@@ -4,6 +4,7 @@
 #![windows_subsystem = "windows"]
 
 extern crate ggez;
+extern crate smallvec;
 extern crate strsim;
 extern crate test;
 extern crate winapi;

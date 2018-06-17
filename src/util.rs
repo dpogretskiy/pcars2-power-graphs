@@ -1,6 +1,7 @@
 use ggez::graphics::*;
 use ggez::*;
-use std::collections::{HashMap, VecDeque};
+use smallvec::SmallVec;
+use std::collections::HashMap;
 
 pub struct NumericTextCache {
     pub numbers: HashMap<i32, graphics::Text>,
@@ -54,8 +55,9 @@ impl OptimizedText {
 pub struct SlidingIter<F, T>
 where
     F: Iterator<Item = T>,
+    T: Sized,
 {
-    acc: VecDeque<T>,
+    acc: SmallVec<[T; 10]>,
     underlying: F,
     by: usize,
     loose: bool,
@@ -75,7 +77,7 @@ where
 {
     fn sliding(self, by: usize) -> SlidingIter<F, T> {
         SlidingIter {
-            acc: VecDeque::with_capacity(by),
+            acc: SmallVec::new(),
             underlying: self,
             by,
             loose: false,
@@ -84,7 +86,7 @@ where
 
     fn sliding_loose(self, by: usize) -> SlidingIter<F, T> {
         SlidingIter {
-            acc: VecDeque::with_capacity(by),
+            acc: SmallVec::new(),
             underlying: self,
             by,
             loose: true,
@@ -93,7 +95,7 @@ where
 }
 
 impl<F: Iterator<Item = T>, T: Clone> Iterator for SlidingIter<F, T> {
-    type Item = VecDeque<T>;
+    type Item = SmallVec<[T; 10]>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -101,7 +103,7 @@ impl<F: Iterator<Item = T>, T: Clone> Iterator for SlidingIter<F, T> {
             if self.acc.len() == 0 {
                 for _ in 0..self.by {
                     if let Some(elem) = self.underlying.next() {
-                        self.acc.push_back(elem);
+                        self.acc.push(elem);
                     }
                 }
 
@@ -113,8 +115,8 @@ impl<F: Iterator<Item = T>, T: Clone> Iterator for SlidingIter<F, T> {
             } else {
                 match self.underlying.next() {
                     Some(elem) => {
-                        self.acc.pop_front();
-                        self.acc.push_back(elem);
+                        self.acc.remove(0);
+                        self.acc.push(elem);
                         Some(self.acc.clone())
                     }
                     None => None,
@@ -124,14 +126,14 @@ impl<F: Iterator<Item = T>, T: Clone> Iterator for SlidingIter<F, T> {
             match self.underlying.next() {
                 Some(elem) => {
                     if self.acc.len() >= self.by {
-                        self.acc.pop_front();
+                        self.acc.remove(0);
                     }
-                    self.acc.push_back(elem);
+                    self.acc.push(elem);
                     return Some(self.acc.clone());
                 }
                 None => {
                     if self.acc.len() > 0 {
-                        self.acc.pop_front();
+                        self.acc.remove(0);
                     }
 
                     if self.acc.is_empty() {

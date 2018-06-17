@@ -26,7 +26,7 @@ pub struct PC2App {
     current_track: String,
     power_data: PowerGraphData,
     stupid_graphs: StupidGraphData,
-    diff_graph: DiffGraphData,
+    rake_graph: RakeGraphData,
     optimized_text: OptimizedText,
     numeric_text_cache: NumericTextCache,
     nets_and_borders: NetsAndBorders,
@@ -73,7 +73,7 @@ impl PC2App {
             max_rpm: 1,
             power_data: PowerGraphData::new(rpm_step),
             stupid_graphs: StupidGraphData::new(1000f32),
-            diff_graph: DiffGraphData::new(),
+            rake_graph: RakeGraphData::new(),
             current_car: String::new(),
             current_track: String::new(),
             screen_width,
@@ -117,7 +117,7 @@ impl event::EventHandler for PC2App {
             self.max_rpm = local_copy.mMaxRPM as i32;
             self.power_data = PowerGraphData::new(self.rpm_step);
             self.stupid_graphs = StupidGraphData::new(local_copy.mTrackLength);
-            self.diff_graph = DiffGraphData::new();
+            self.rake_graph = RakeGraphData::new();
 
             self.cars_info.set(&car_name);
 
@@ -159,7 +159,16 @@ impl event::EventHandler for PC2App {
                     / (left_wheel_rps.abs().max(right_wheel_rps.abs()));
 
                 if local_copy.mGameState == GameState::GAME_INGAME_PLAYING {
-                    self.diff_graph.add(diff_percent, self.start_time.elapsed());
+                    let front_rh = (local_copy.mWheelLocalPositionY.data
+                        [Tyre::TyreFrontLeft as usize]
+                        + local_copy.mWheelLocalPositionY.data[Tyre::TyreFrontRight as usize])
+                        / 2f32;
+                    let rear_rh = (local_copy.mWheelLocalPositionY.data[Tyre::TyreRearLeft as usize]
+                        + local_copy.mWheelLocalPositionY.data[Tyre::TyreRearRight as usize])
+                        / 2f32;
+
+                    self.rake_graph
+                        .add(front_rh, rear_rh, self.start_time.elapsed());
                 }
 
                 let tyre_rps = ((tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
@@ -234,6 +243,7 @@ impl event::EventHandler for PC2App {
             self.stupid_graphs.track_length,
             &screen_size,
             &self.numeric_text_cache,
+            self.rake_graph.max_height,
         )?;
 
         //power
@@ -274,7 +284,7 @@ impl event::EventHandler for PC2App {
         self.cars_info
             .draw_from_right(ctx, &Point2::new(self.screen_width, 0f32))?;
 
-        self.diff_graph.draw(ctx, &screen_size)?;
+        self.rake_graph.draw(ctx, &screen_size)?;
 
         graphics::present(ctx);
 

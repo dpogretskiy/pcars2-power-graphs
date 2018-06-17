@@ -6,6 +6,7 @@ use util::*;
 
 pub struct NetsAndBorders {
     region_borders: Mesh,
+    #[allow(dead_code)]
     percents: HashMap<i32, Text>,
     left_region_horizontal: Mesh,
     left_region_vertical: Mesh,
@@ -122,6 +123,7 @@ impl NetsAndBorders {
         max_distance: f32,
         screen_size: &Point2,
         numeric_cache: &NumericTextCache,
+        max_rh: f32,
     ) -> GameResult<()> {
         let draw_digit =
             |ctx: &mut Context, mut point: Point2, digit: i32, fat: bool| -> GameResult<()> {
@@ -144,24 +146,24 @@ impl NetsAndBorders {
                 Ok(())
             };
 
-        let draw_percent =
-            |ctx: &mut Context, mut point: Point2, number: i32, fat: bool| -> GameResult<()> {
-                let text = self.percents.get(&number);
-                if let Some(text) = text {
-                    point.x += if fat { 3f32 } else { 2f32 };
-                    point.y += 2f32;
-                    graphics::draw_ex(
-                        ctx,
-                        text,
-                        DrawParam {
-                            dest: point,
-                            scale: Point2::new(0.5, 0.5),
-                            ..Default::default()
-                        },
-                    )?;
-                }
-                Ok(())
-            };
+        // let draw_percent =
+        //     |ctx: &mut Context, mut point: Point2, number: i32, fat: bool| -> GameResult<()> {
+        //         let text = self.percents.get(&number);
+        //         if let Some(text) = text {
+        //             point.x += if fat { 3f32 } else { 2f32 };
+        //             point.y += 2f32;
+        //             graphics::draw_ex(
+        //                 ctx,
+        //                 text,
+        //                 DrawParam {
+        //                     dest: point,
+        //                     scale: Point2::new(0.5, 0.5),
+        //                     ..Default::default()
+        //                 },
+        //             )?;
+        //         }
+        //         Ok(())
+        //     };
 
         graphics::set_color(ctx, Color::from_rgba(127, 127, 127, 127))?;
         self.region_borders
@@ -203,11 +205,11 @@ impl NetsAndBorders {
             )?;
         }
 
-        for diff in (10i32..101).step_by(10) {
-            let y = diff as f32 / 100.0;
+        for rh in 1..(max_rh * 120.0) as i32 + 1 {
+            let y = rh as f32 / (max_rh * 1.2);
             let dest = scale_right_bottom(0f32, y, screen_size);
-            if diff == 10 || diff == 50 || diff == 100 {
-                draw_percent(ctx, dest, diff, true)?;
+            if rh == 2 || rh == 5 || rh == 8 {
+                draw_digit(ctx, dest, rh, true)?;
             }
 
             graphics::draw(ctx, &self.right_region_horizontal, dest, 0f32)?;
