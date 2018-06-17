@@ -12,6 +12,8 @@ use util::*;
 const MAGIC_GEAR_RATIO: f32 = 9.534739389568648;
 const _MAGIC_SPEED: f32 = 0.004787775304098672;
 
+pub const FONT_OFFSET: f32 = 2.0;
+
 pub struct PC2App {
     shared_data: *const SharedMemory,
     local_copy: SharedMemory,
@@ -58,6 +60,8 @@ impl PC2App {
 
         let cars_info = AllCarsData::new(font);
 
+        graphics::set_background_color(ctx, Color::from_rgb(18, 31, 52));
+
         // "MAXHP: {} MAXRPM: {}, GEAR: {}, RPM: {}, HP: {}",
         PC2App {
             shared_data: sm,
@@ -82,7 +86,7 @@ impl PC2App {
     }
 
     pub fn load_font(ctx: &mut Context) -> graphics::Font {
-        graphics::Font::new(ctx, "/DejaVuSerif.ttf", 18).unwrap()
+        graphics::Font::new(ctx, "/Oswald.ttf", 18).unwrap()
     }
 }
 
@@ -212,14 +216,13 @@ impl event::EventHandler for PC2App {
         if !timer::check_update_time(ctx, 30) {
             return Ok(());
         }
-
-        graphics::set_color(ctx, Color::from_rgb(18, 31, 52))?;
         graphics::clear(ctx);
 
         let screen_size = Point2::new(self.screen_width, self.screen_height);
 
         //net
-        let graph_height = self.power_data
+        let graph_height = self
+            .power_data
             .power
             .max_value
             .max(self.power_data.torque.max_value) * 1.2;

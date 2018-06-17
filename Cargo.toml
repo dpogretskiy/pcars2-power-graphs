@@ -9,6 +9,5 @@ ggez = "0.4.3"
 strsim = "0.7.0"
 
 [profile.release]
-debug = false 
+debug = true  
 lto = true
-panic = 'abort'

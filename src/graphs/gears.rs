@@ -109,7 +109,8 @@ impl StupidGraphData {
         max_rpm: i32,
     ) -> GameResult<()> {
         if !self.ratios.is_empty() && power.torque.values.len() > 1 {
-            let max_gear = self.ratios
+            let max_gear = self
+                .ratios
                 .keys()
                 .max_by_key(|x| x.clone())
                 .unwrap()
@@ -123,13 +124,15 @@ impl StupidGraphData {
                 }
             };
 
-            let max_ratio = self.ratios
+            let max_ratio = self
+                .ratios
                 .iter()
                 .max_by(|x, y| ord_f32(&x.1.ratio, &y.1.ratio))
                 .map(|x| x.1.ratio.clone())
                 .unwrap();
 
-            let min_ratio = self.ratios
+            let min_ratio = self
+                .ratios
                 .iter()
                 .min_by(|x, y| ord_f32(&x.1.ratio, &y.1.ratio))
                 .map(|x| x.1.ratio.clone())
@@ -163,37 +166,52 @@ impl StupidGraphData {
                 &Point2::new(self.track_length, 10f32),
             )?;
 
-            for r in self.ratios.iter_mut() {
-                let (gear, mut ratio) = r;
-                let alpha = *gear as f32 / max_gear as f32;
+            let smooth = power
+                .torque
+                .values
+                .iter()
+                .sliding(5)
+                .map(|v| {
+                    let x = *v[2].0 as f32;
+                    let y = v.iter().map(|x| x.1).sum::<f32>() / 5f32;
+                    (x, y)
+                })
+                .collect::<Vec<_>>();
 
-                let x_max = max_rpm as f32 / min_ratio;
+            if smooth.len() > 1 {
+                for r in self.ratios.iter_mut() {
+                    let (gear, mut ratio) = r;
+                    let alpha = *gear as f32 / max_gear as f32;
 
-                let mut points = vec![];
-                for (r, t) in power.torque.values.iter() {
-                    points.push(scale_left(
-                        (*r as f32 / ratio.ratio) / x_max,
-                        (t * ratio.ratio) / y_max,
-                        screen_size,
-                    ));
-                }
+                    let x_max = max_rpm as f32 / min_ratio;
 
-                color.a = alpha;
-                graphics::set_color(ctx, color)?;
-                graphics::line(ctx, &points, 2f32)?;
+                    let mut points = vec![];
 
-                if ratio.gear == current_gear {
-                    // let dot = Point2::new(
-                    //     x_scale * power.torque.current_value.0 as f32,
-                    //     screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
-                    // );
-                    let dot = scale_left(
-                        (power.torque.current_value.0 as f32 / ratio.ratio) / x_max,
-                        (power.torque.current_value.1 * ratio.ratio) / y_max,
-                        screen_size,
-                    );
-                    graphics::set_color(ctx, Color::from_rgb(255, 140, 0))?;
-                    graphics::circle(ctx, DrawMode::Fill, dot, 3f32, 1f32)?;
+                    for (r, t) in smooth.iter() {
+                        points.push(scale_left(
+                            (*r / ratio.ratio) / x_max,
+                            (t * ratio.ratio) / y_max,
+                            screen_size,
+                        ));
+                    }
+
+                    color.a = alpha;
+                    graphics::set_color(ctx, color)?;
+                    graphics::line(ctx, &points, 2f32)?;
+
+                    if ratio.gear == current_gear {
+                        // let dot = Point2::new(
+                        //     x_scale * power.torque.current_value.0 as f32,
+                        //     screen_size.y - y_scale * power.torque.current_value.1 * ratio.ratio,
+                        // );
+                        let dot = scale_left(
+                            (power.torque.current_value.0 as f32 / ratio.ratio) / x_max,
+                            (power.torque.current_value.1 * ratio.ratio) / y_max,
+                            screen_size,
+                        );
+                        graphics::set_color(ctx, Color::from_rgb(255, 140, 0))?;
+                        graphics::circle(ctx, DrawMode::Fill, dot, 3f32, 1f32)?;
+                    }
                 }
             }
         }

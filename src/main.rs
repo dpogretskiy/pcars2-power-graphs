@@ -1,9 +1,11 @@
+#![feature(test)]
 #![feature(iterator_step_by)]
 #![feature(duration_extras)]
 #![windows_subsystem = "windows"]
 
 extern crate ggez;
 extern crate strsim;
+extern crate test;
 extern crate winapi;
 
 pub mod app;

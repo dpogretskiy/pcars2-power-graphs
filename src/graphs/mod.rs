@@ -1,18 +1,20 @@
 pub mod nets;
 
-mod rollndiff;
 mod gears;
+mod rollndiff;
 
-pub use self::rollndiff::*;
 pub use self::gears::*;
 use self::nets::*;
+pub use self::rollndiff::*;
+
+use util::*;
 
 use definitions::*;
-use std::collections::{BTreeMap, VecDeque};
-use ggez::*;
 use ggez::graphics::*;
-use std::f32;
+use ggez::*;
 use std::cmp::Ordering;
+use std::collections::{BTreeMap, VecDeque};
+use std::f32;
 
 pub struct GraphLine {
     step: i32,
@@ -43,6 +45,8 @@ impl GraphLine {
         region: GraphRegion,
         smoothening: usize,
     ) -> GraphLine {
+        let smoothening = smoothening.max(1);
+
         GraphLine {
             step,
             draw_shadow,
@@ -106,40 +110,58 @@ impl GraphLine {
         screen_size: &Point2,
         max_values: &Point2,
     ) -> GameResult<()> {
-        let severity = self.smoothening;
-
         if self.values.len() > 1 {
             if self.cache.is_none() {
-                let src: Vec<_> = self.values.iter().collect();
-                let len = src.len();
+                let smooth = self
+                    .values
+                    .iter()
+                    .sliding_loose(self.smoothening)
+                    .map(|v| {
+                        let point = v[0];
+                        let avg: f32 = v.iter().map(|p| *p.1).sum::<f32>() / v.len() as f32;
 
-                let mut vec: Vec<Point2> = Vec::with_capacity(len);
+                        let x = *point.0 as f32 / max_values.x;
+                        let y = avg / max_values.y;
 
-                for i in 0..len {
-                    let (k, _) = src[i];
-                    let mut start = if i - severity > 0 { i - severity } else { len };
-                    let mut end = (i + severity).min(len);
+                        self.scale_point(x, y, screen_size)
+                    })
+                    .collect::<Vec<_>>();
 
-                    let mut sum = 0f32;
+                let mesh = Mesh::new_line(ctx, &smooth, self.line_width)?;
+                self.cache = Some(mesh);
+                // .map(|iter| iter.average());
 
-                    for j in start..end {
-                        sum += src[j].1;
-                    }
+                // let src: Vec<_> = self.values.iter().collect();
+                // let len = src.len();
 
-                    let avg = sum / (end - start) as f32;
-                    let x = *k as f32 / max_values.x;
-                    let y = avg / max_values.y;
-                    if x > 0f32 && x < 1f32 && y >= 0f32 && y < 1f32 {
-                        vec.push(self.scale_point(x, y, screen_size));
-                    }
-                }
+                // let mut vec: Vec<Point2> = Vec::with_capacity(len);
 
-                if vec.len() > 1 {
-                    let mesh = Mesh::new_line(ctx, &vec, self.line_width)?;
-                    self.cache = Some(mesh)
-                }
+                // for i in 0..len {
+                //     let (k, _) = src[i];
+                //     let mut start = if i - severity > 0 { i - severity } else { len };
+                //     let mut end = (i + severity).min(len);
+
+                //     let mut sum = 0f32;
+
+                //     for j in start..end {
+                //         sum += src[j].1;
+                //     }
+
+                //     let avg = sum / (end - start) as f32;
+                //     let x = *k as f32 / max_values.x;
+                //     let y = avg / max_values.y;
+                //     if x > 0f32 && x < 1f32 && y >= 0f32 && y < 1f32 {
+                //         vec.push(self.scale_point(x, y, screen_size));
+                //     }
+                // }
+
+                // if vec.len() > 1 {
+                //     let mesh = Mesh::new_line(ctx, &vec, self.line_width)?;
+                //     self.cache = Some(mesh)
+                // }
             }
         }
+
         self.draw_old(ctx, line_color, dot_color, screen_size, max_values)?;
         Ok(())
     }
@@ -153,21 +175,6 @@ impl GraphLine {
         max_values: &Point2,
     ) -> GameResult<()> {
         if self.values.len() > 1 {
-            if self.cache.is_none() {
-                let mut vec: Vec<Point2> = Vec::with_capacity(self.values.len());
-                self.values.iter().for_each(|(k, v)| {
-                    let x = *k as f32 / max_values.x;
-                    let y = v / max_values.y;
-                    if x > 0f32 && x < 1f32 && y > 0f32 && y < 1f32 {
-                        vec.push(self.scale_point(x, y, screen_size));
-                    }
-                });
-
-                if vec.len() > 1 {
-                    let mesh = Mesh::new_line(ctx, &vec, self.line_width)?;
-                    self.cache = Some(mesh);
-                }
-            } // graphics::set_color(ctx, line_color)?;
             if let Some(ref cache) = self.cache {
                 cache.draw_ex(
                     ctx,
@@ -178,7 +185,6 @@ impl GraphLine {
                 )?;
             }
 
-            // graphics::line(ctx, &v, 2f32)?;
             if self.draw_dot && !self.draw_shadow && self.current_value.1 > 0f32 {
                 graphics::set_color(ctx, dot_color)?;
 
@@ -235,9 +241,12 @@ pub struct PowerGraphData {
 impl PowerGraphData {
     pub fn new(rpm_step: i32) -> PowerGraphData {
         PowerGraphData {
-            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight, 0).zero_on_current(false),
-            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3).zero_on_current(false),
-            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3).zero_on_current(false),
+            throttle: GraphLine::new(rpm_step, false, false, GraphRegion::TopRight, 1)
+                .zero_on_current(false),
+            torque: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3)
+                .zero_on_current(false),
+            power: GraphLine::new(rpm_step, true, true, GraphRegion::TopRight, 3)
+                .zero_on_current(false),
         }
     }
 

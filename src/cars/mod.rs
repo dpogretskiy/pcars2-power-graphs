@@ -6,6 +6,8 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use strsim;
 
+use app;
+
 pub struct AllCarsData {
     data: Vec<CarInfoCached>,
     current_car_ix: Option<usize>,
@@ -24,7 +26,8 @@ impl AllCarsData {
     }
 
     pub fn set(&mut self, car_name: &String) {
-        let car_info = self.data
+        let car_info = self
+            .data
             .iter()
             .enumerate()
             .max_by(|(_, info_l), (_, info_r)| {
@@ -56,7 +59,10 @@ impl AllCarsData {
     pub fn draw_from_right(&mut self, ctx: &mut Context, dest: &Point2) -> GameResult<()> {
         if let Some(ix) = self.current_car_ix {
             let text: &Text = self.data[ix].get_text(ctx, &self.font);
-            let dest = Point2::new(dest.x - text.width() as f32 - 2f32, dest.y + 2f32);
+            let dest = Point2::new(
+                dest.x - text.width() as f32 - app::FONT_OFFSET,
+                dest.y + app::FONT_OFFSET,
+            );
             text.draw(ctx, dest, 0f32)?
         }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use ggez::*;
 use ggez::graphics::*;
+use ggez::*;
 use util::*;
 
 pub struct NetsAndBorders {
@@ -257,6 +257,7 @@ impl NetsAndBorders {
     }
 }
 
+#[inline]
 pub fn scale_left(x: f32, y: f32, scr_size: &Point2) -> Point2 {
     Point2::new(
         0.6 * x * scr_size.x,
@@ -264,6 +265,7 @@ pub fn scale_left(x: f32, y: f32, scr_size: &Point2) -> Point2 {
     )
 }
 
+#[inline]
 pub fn scale_right_top(x: f32, y: f32, scr_size: &Point2) -> Point2 {
     Point2::new(
         (0.6 + x * 0.4) * scr_size.x,
@@ -271,6 +273,7 @@ pub fn scale_right_top(x: f32, y: f32, scr_size: &Point2) -> Point2 {
     )
 }
 
+#[inline]
 pub fn scale_right_bottom(x: f32, y: f32, scr_size: &Point2) -> Point2 {
     Point2::new(
         (0.6 + x * 0.4) * scr_size.x,
