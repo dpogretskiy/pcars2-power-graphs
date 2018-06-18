@@ -7,7 +7,7 @@ use util::*;
 pub struct NetsAndBorders {
     region_borders: Mesh,
     #[allow(dead_code)]
-    percents: HashMap<i32, Text>,
+    cm_text: HashMap<i32, Text>,
     left_region_horizontal: Mesh,
     left_region_vertical: Mesh,
     right_region_horizontal: Mesh,
@@ -51,12 +51,12 @@ impl NetsAndBorders {
             .unwrap();
 
         //graph texts
-        let percents = (0..101)
-            .step_by(10)
+        let cm_text = (-50..50)
+            .step_by(1)
             .map(|num| {
                 (
                     num,
-                    graphics::Text::new(ctx, &format!("{}%", num), font).unwrap(),
+                    graphics::Text::new(ctx, &format!("{} cm", num), font).unwrap(),
                 )
             })
             .collect();
@@ -105,7 +105,7 @@ impl NetsAndBorders {
 
         NetsAndBorders {
             region_borders,
-            percents,
+            cm_text,
             left_region_horizontal,
             left_region_vertical,
             right_region_vertical,
@@ -124,21 +124,21 @@ impl NetsAndBorders {
         screen_size: &Point2,
         numeric_cache: &NumericTextCache,
         max_rh: f32,
+        min_rh: f32,
     ) -> GameResult<()> {
         let draw_digit =
             |ctx: &mut Context, mut point: Point2, digit: i32, fat: bool| -> GameResult<()> {
-                let text = numeric_cache.numbers.get(&digit);
+                let text = numeric_cache.small_numbers.get(&digit);
 
                 if let Some(text) = text {
-                    point.x += if fat { 3f32 } else { 2f32 };
-                    point.y -= text.height() as f32 / 2f32 + 2f32;
+                    point.x += if fat { 4f32 } else { 3f32 };
+                    point.y -= text.height() as f32 + 2f32;
 
                     graphics::draw_ex(
                         ctx,
                         text,
                         DrawParam {
                             dest: point,
-                            scale: Point2::new(0.5, 0.5),
                             ..Default::default()
                         },
                     )?
@@ -146,24 +146,23 @@ impl NetsAndBorders {
                 Ok(())
             };
 
-        // let draw_percent =
-        //     |ctx: &mut Context, mut point: Point2, number: i32, fat: bool| -> GameResult<()> {
-        //         let text = self.percents.get(&number);
-        //         if let Some(text) = text {
-        //             point.x += if fat { 3f32 } else { 2f32 };
-        //             point.y += 2f32;
-        //             graphics::draw_ex(
-        //                 ctx,
-        //                 text,
-        //                 DrawParam {
-        //                     dest: point,
-        //                     scale: Point2::new(0.5, 0.5),
-        //                     ..Default::default()
-        //                 },
-        //             )?;
-        //         }
-        //         Ok(())
-        //     };
+        let draw_cm =
+            |ctx: &mut Context, mut point: Point2, number: i32, fat: bool| -> GameResult<()> {
+                let text = self.cm_text.get(&number);
+                if let Some(text) = text {
+                    point.x += if fat { 4f32 } else { 3f32 };
+                    point.y += 2f32;
+                    graphics::draw_ex(
+                        ctx,
+                        text,
+                        DrawParam {
+                            dest: point,
+                            ..Default::default()
+                        },
+                    )?;
+                }
+                Ok(())
+            };
 
         graphics::set_color(ctx, Color::from_rgba(127, 127, 127, 127))?;
         self.region_borders
@@ -205,11 +204,11 @@ impl NetsAndBorders {
             )?;
         }
 
-        for rh in 1..(max_rh * 120.0) as i32 + 1 {
-            let y = rh as f32 / (max_rh * 1.2);
+        for rh in ((min_rh * 1.2) as i32)..(max_rh * 1.2) as i32 {
+            let y = (rh as f32 - min_rh * 1.2) / (max_rh * 1.2 - min_rh * 1.2);
             let dest = scale_right_bottom(0f32, y, screen_size);
-            if rh == 2 || rh == 5 || rh == 8 {
-                draw_digit(ctx, dest, rh, true)?;
+            if rh % 2 == 1 || rh == 0 {
+                draw_cm(ctx, dest, rh, true)?;
             }
 
             graphics::draw(ctx, &self.right_region_horizontal, dest, 0f32)?;
@@ -220,13 +219,12 @@ impl NetsAndBorders {
             let dest = scale_left(0f32, y, screen_size);
             if accel == 1 {
                 let mut dest = scale_left(0f32, y, screen_size);
-                dest.x += 2f32;
-                dest.y -= self.one_g_text.height() as f32 / 2f32 + 2f32;
+                dest.x += 3f32;
+                dest.y -= self.one_g_text.height() as f32 + 2f32;
                 self.one_g_text.draw_ex(
                     ctx,
                     DrawParam {
                         dest,
-                        scale: Point2::new(0.5, 0.5),
                         ..Default::default()
                     },
                 )?;
@@ -239,13 +237,12 @@ impl NetsAndBorders {
             let x = distance as f32 / max_distance;
             if distance == 500 {
                 let mut dest = scale_left(x, 0f32, screen_size);
-                dest.x += 2f32;
-                dest.y -= self.fifty_kmph_text.height() as f32 / 2f32 + 2f32;
+                dest.x += 3f32;
+                dest.y -= self.fifty_kmph_text.height() as f32 + 2f32;
                 self.fifty_kmph_text.draw_ex(
                     ctx,
                     DrawParam {
                         dest,
-                        scale: Point2::new(0.5, 0.5),
                         ..Default::default()
                     },
                 )?;

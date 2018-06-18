@@ -43,22 +43,23 @@ impl PC2App {
         screen_height: f32,
         rpm_step: i32,
     ) -> PC2App {
-        let font = PC2App::load_font(ctx);
+        let large_font = PC2App::load_font(ctx);
+        let small_font = PC2App::load_small_font(ctx);
         let fragments = vec![
-            graphics::Text::new(ctx, "MAXHP: ", &font).unwrap(),
-            graphics::Text::new(ctx, "MAXRPM: ", &font).unwrap(),
-            graphics::Text::new(ctx, "GEAR: ", &font).unwrap(),
-            graphics::Text::new(ctx, "RPM: ", &font).unwrap(),
-            graphics::Text::new(ctx, "HP: ", &font).unwrap(),
-            graphics::Text::new(ctx, "GR: ", &font).unwrap(),
+            graphics::Text::new(ctx, "MAXHP: ", &large_font).unwrap(),
+            graphics::Text::new(ctx, "MAXRPM: ", &large_font).unwrap(),
+            graphics::Text::new(ctx, "GEAR: ", &large_font).unwrap(),
+            graphics::Text::new(ctx, "RPM: ", &large_font).unwrap(),
+            graphics::Text::new(ctx, "HP: ", &large_font).unwrap(),
+            graphics::Text::new(ctx, "GR: ", &large_font).unwrap(),
         ];
-        let numeric_text_cache = NumericTextCache::new(ctx, &font);
+        let numeric_text_cache = NumericTextCache::new(ctx, &large_font, &small_font);
         let optimized_text = OptimizedText::new(fragments);
 
         let nets_and_borders =
-            NetsAndBorders::new(ctx, &Point2::new(screen_width, screen_height), &font);
+            NetsAndBorders::new(ctx, &Point2::new(screen_width, screen_height), &small_font);
 
-        let cars_info = AllCarsData::new(font);
+        let cars_info = AllCarsData::new(large_font);
 
         graphics::set_background_color(ctx, Color::from_rgb(18, 31, 52));
 
@@ -87,6 +88,10 @@ impl PC2App {
 
     pub fn load_font(ctx: &mut Context) -> graphics::Font {
         graphics::Font::new(ctx, "/Oswald.ttf", 18).unwrap()
+    }
+
+    pub fn load_small_font(ctx: &mut Context) -> graphics::Font {
+        graphics::Font::new(ctx, "/Oswald.ttf", 10).unwrap()
     }
 }
 
@@ -150,6 +155,14 @@ impl event::EventHandler for PC2App {
         if self.current_gear != local_copy.mGear {
             self.current_gear = local_copy.mGear;
         } else {
+            if local_copy.mGameState == GameState::GAME_INGAME_PLAYING {
+                let front_rh = local_copy.mSuspensionTravel.front_avg();
+                let rear_rh = local_copy.mSuspensionTravel.rear_avg();
+
+                self.rake_graph
+                    .add(front_rh, rear_rh, self.start_time.elapsed());
+            }
+
             if self.current_gear > 0 {
                 let tyre_rps_arr = local_copy.mTyreRPS.clone();
                 let left_wheel_rps = tyre_rps_arr.data[Tyre::TyreRearLeft as usize];
@@ -158,23 +171,7 @@ impl event::EventHandler for PC2App {
                 let diff_percent = (left_wheel_rps.abs().min(right_wheel_rps.abs()))
                     / (left_wheel_rps.abs().max(right_wheel_rps.abs()));
 
-                if local_copy.mGameState == GameState::GAME_INGAME_PLAYING {
-                    let front_rh = (local_copy.mWheelLocalPositionY.data
-                        [Tyre::TyreFrontLeft as usize]
-                        + local_copy.mWheelLocalPositionY.data[Tyre::TyreFrontRight as usize])
-                        / 2f32;
-                    let rear_rh = (local_copy.mWheelLocalPositionY.data[Tyre::TyreRearLeft as usize]
-                        + local_copy.mWheelLocalPositionY.data[Tyre::TyreRearRight as usize])
-                        / 2f32;
-
-                    self.rake_graph
-                        .add(front_rh, rear_rh, self.start_time.elapsed());
-                }
-
-                let tyre_rps = ((tyre_rps_arr.data[Tyre::TyreRearLeft as usize]
-                    + tyre_rps_arr.data[Tyre::TyreRearRight as usize])
-                    / 2f32)
-                    .abs();
+                let tyre_rps = tyre_rps_arr.rear_avg().abs();
 
                 let ratio = current_rpm_f32 / tyre_rps;
                 let gear_ratio = ratio / MAGIC_GEAR_RATIO;
@@ -244,6 +241,7 @@ impl event::EventHandler for PC2App {
             &screen_size,
             &self.numeric_text_cache,
             self.rake_graph.max_height,
+            self.rake_graph.min_height,
         )?;
 
         //power

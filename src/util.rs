@@ -5,18 +5,29 @@ use std::collections::HashMap;
 
 pub struct NumericTextCache {
     pub numbers: HashMap<i32, graphics::Text>,
+    pub small_numbers: HashMap<i32, graphics::Text>,
 }
 
 impl NumericTextCache {
-    pub fn new(ctx: &mut Context, font: &graphics::Font) -> NumericTextCache {
+    pub fn new(
+        ctx: &mut Context,
+        font: &graphics::Font,
+        small_font: &graphics::Font,
+    ) -> NumericTextCache {
         let mut numbers = HashMap::new();
+        let mut small_numbers = HashMap::new();
 
         for number in (-1500..1501).chain((1510..20001).step_by(10)) {
             let txt = graphics::Text::new(ctx, &number.to_string(), font).unwrap();
+            let small_txt = graphics::Text::new(ctx, &number.to_string(), small_font).unwrap();
             numbers.insert(number, txt);
+            small_numbers.insert(number, small_txt);
         }
 
-        NumericTextCache { numbers }
+        NumericTextCache {
+            numbers,
+            small_numbers,
+        }
     }
 }
 

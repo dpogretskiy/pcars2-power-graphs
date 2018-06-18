@@ -287,6 +287,16 @@ pub struct TyresArray<T> {
   pub data: [T; TYRE_MAX],
 }
 
+impl TyresArray<f32> {
+  pub fn front_avg(&self) -> f32 {
+    (self.data[Tyre::TyreFrontLeft as usize] + self.data[Tyre::TyreFrontRight as usize]) / 2f32
+  }
+
+  pub fn rear_avg(&self) -> f32 {
+    (self.data[Tyre::TyreRearLeft as usize] + self.data[Tyre::TyreRearRight as usize]) / 2f32
+  }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Vec3<T> {
   pub x: T,

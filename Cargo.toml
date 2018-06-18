@@ -12,3 +12,6 @@ smallvec = "0.6"
 [profile.release]
 debug = true  
 lto = true
+
+[build-dependencies]
+winres = "0.1"

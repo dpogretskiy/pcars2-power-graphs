@@ -1,3 +1,5 @@
+extern crate winres;
+
 use std::env;
 use std::path::PathBuf;
 
@@ -27,12 +29,15 @@ fn main() {
                 let file_name = file_name.to_str().unwrap();
                 if file_name.ends_with(".dll") {
                     new_file_path.push(file_name);
-                    std::fs::copy(&entry_path, new_file_path.as_path()).expect(
-                        "Can't copy from DLL dir",
-                    );
+                    std::fs::copy(&entry_path, new_file_path.as_path())
+                        .expect("Can't copy from DLL dir");
                 }
             }
         }
+
+        let mut res = winres::WindowsResource::new();
+        res.set_icon("meta/egg.ico");
+        res.compile().unwrap();
     } else if target.contains("linux") {
 
     }
