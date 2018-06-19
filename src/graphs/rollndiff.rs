@@ -118,8 +118,8 @@ impl RakeGraphData {
     pub fn draw(&mut self, ctx: &mut Context, screen_size: &Point2) -> GameResult<()> {
         let end = self.current_time.clone();
 
-        let max = self.max_height * 1.2;
-        let min = self.min_height * 1.2;
+        let max = self.max_height + (self.max_height - self.min_height) * 0.2;
+        let min = self.min_height - (self.max_height - self.min_height) * 0.2;
 
         let x_start = screen_size.x * 0.6;
         let x_end = screen_size.x - (screen_size.x - x_start) * 0.2;
