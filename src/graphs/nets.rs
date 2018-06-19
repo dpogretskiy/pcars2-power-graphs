@@ -207,7 +207,7 @@ impl NetsAndBorders {
         for rh in ((min_rh * 1.2) as i32)..(max_rh * 1.2) as i32 {
             let y = (rh as f32 - min_rh * 1.2) / (max_rh * 1.2 - min_rh * 1.2);
             let dest = scale_right_bottom(0f32, y, screen_size);
-            if rh % 2 == 1 || rh == 0 {
+            if rh % 2 != 0 || rh == 0 {
                 draw_cm(ctx, dest, rh, true)?;
             }
 
