@@ -166,11 +166,10 @@ impl StupidGraphData {
                 &Point2::new(self.track_length, 10f32),
             )?;
 
-            let smooth = power
-                .torque
-                .values
-                .iter()
-                .sliding(5)
+            let values: Vec<_> = power.torque.values.iter().collect();
+
+            let smooth = values
+                .windows(5)
                 .map(|v| {
                     let x = *v[2].0 as f32;
                     let y = v.iter().map(|x| x.1).sum::<f32>() / 5f32;
@@ -180,7 +179,7 @@ impl StupidGraphData {
 
             if smooth.len() > 1 {
                 for r in self.ratios.iter_mut() {
-                    let (gear, mut ratio) = r;
+                    let (gear, ratio) = r;
                     let alpha = *gear as f32 / max_gear as f32;
 
                     let x_max = max_rpm as f32 / min_ratio;

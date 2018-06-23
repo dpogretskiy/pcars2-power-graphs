@@ -1,12 +1,9 @@
-#![feature(test)]
-#![feature(iterator_step_by)]
-#![feature(duration_extras)]
+#![feature(rust_2018_preview, duration_extras, iterator_step_by)]
 #![windows_subsystem = "windows"]
 
 extern crate ggez;
 extern crate smallvec;
 extern crate strsim;
-extern crate test;
 extern crate winapi;
 
 pub mod app;
@@ -19,22 +16,31 @@ use app::*;
 use definitions::*;
 use ggez::*;
 use std::env;
+use std::ffi::OsStr;
+use std::iter::once;
 use std::mem;
+use std::os::windows::ffi::OsStrExt;
 use std::path;
+use std::ptr::null_mut;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::*;
 use winapi::um::memoryapi::*;
 use winapi::um::winnt::*;
+use winapi::um::winuser::{MessageBoxW, MB_OK};
 
 // pub const MAP_OBJECT_NAME: &str = "$pcars2$";
-pub const MAP_OBJECT_NAME: [u16; 9] = [36, 112, 99, 97, 114, 115, 50, 36, 0];
+// pub const MAP_OBJECT_NAME: [u16; 9] = [36, 112, 99, 97, 114, 115, 50, 36, 0];
 
 fn main() {
-    let file_handle =
-        unsafe { OpenFileMappingW(PAGE_READONLY, 0, (&MAP_OBJECT_NAME) as *const u16) };
+    let file_name: Vec<u16> = OsStr::new("$pcars2$")
+        .encode_wide()
+        .chain(once(0))
+        .collect();
+
+    let file_handle = unsafe { OpenFileMappingW(PAGE_READONLY, 0, file_name.as_ptr()) };
 
     if file_handle.is_null() {
-        println!("Game is not open!");
+        print_message("Game is not open!").unwrap();
         return;
     }
 
@@ -45,11 +51,12 @@ fn main() {
 
     if shared_data.is_null() {
         unsafe {
-            println!(
+            let msg = format!(
                 "Shared data is invalid, check versions.\nError code: [{:?}]",
                 GetLastError()
             );
             CloseHandle(file_handle);
+            print_message(&msg).unwrap();
         };
         return;
     }
@@ -59,7 +66,12 @@ fn main() {
     // });
 
     if unsafe { (*shared_data).mVersion } != SHARED_MEMORY_VERSION {
-        println!("Data version mismatch!");
+        let msg = format!(
+            "Data version mismatch, found: [{}], required: [{}]",
+            unsafe { (*shared_data).mVersion },
+            SHARED_MEMORY_VERSION
+        );
+        print_message(&msg).unwrap();
         return;
     }
 
@@ -85,4 +97,19 @@ fn main() {
 
     let state = &mut PC2App::new(ctx, shared_data, 1200f32, 600f32, 20);
     event::run(ctx, state).unwrap();
+}
+
+use std::io::Error;
+
+fn print_message(msg: &str) -> Result<i32, Error> {
+    let error: Vec<u16> = OsStr::new("Error!").encode_wide().chain(once(0)).collect();
+    let message: Vec<u16> = OsStr::new(msg).encode_wide().chain(once(0)).collect();
+
+    let ret = unsafe { MessageBoxW(null_mut(), message.as_ptr(), error.as_ptr(), MB_OK) };
+
+    if ret == 0 {
+        Err(Error::last_os_error())
+    } else {
+        Ok(ret)
+    }
 }

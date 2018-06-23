@@ -1,17 +1,17 @@
 [package]
 name = "power-graph"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Dmitriy Pogretskiy <dpogretskiy@gmail.com>"]
 
 [dependencies]
-winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryapi"] }
+winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "memoryapi", "winuser"] }
 ggez = "0.4.3"
 strsim = "0.7.0"
 smallvec = "0.6"
 
 [profile.release]
 debug = true  
-lto = true
+lto = false 
 
 [build-dependencies]
 winres = "0.1"

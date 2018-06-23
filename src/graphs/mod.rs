@@ -7,8 +7,6 @@ pub use self::gears::*;
 use self::nets::*;
 pub use self::rollndiff::*;
 
-use util::*;
-
 use definitions::*;
 use ggez::graphics::*;
 use ggez::*;
@@ -110,12 +108,12 @@ impl GraphLine {
         screen_size: &Point2,
         max_values: &Point2,
     ) -> GameResult<()> {
-        if self.values.len() > 1 {
+        if self.values.len() > self.smoothening {
             if self.cache.is_none() {
-                let smooth = self
-                    .values
-                    .iter()
-                    .sliding_loose(self.smoothening)
+                let values = self.values.iter().collect::<Vec<_>>();
+
+                let smooth = values
+                    .windows(self.smoothening)
                     .map(|v| {
                         let point = v[0];
                         let avg: f32 = v.iter().map(|p| *p.1).sum::<f32>() / v.len() as f32;
